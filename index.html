@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delivery Routes - Gestión de Reparto</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Login Page -->
+    <div id="loginPage" class="login-container">
+        <div class="login-card">
+            <div class="logo">
+                <i class="fas fa-truck-fast"></i>
+            </div>
+            <h2>Delivery Routes</h2>
+            <p>Sistema de gestión de entregas y reparto</p>
+            
+            <div class="user-type-selector">
+                <div id="adminOption" class="user-type-option active" onclick="selectUserType('admin')">
+                    <i class="fas fa-user-shield"></i> Administrador
+                </div>
+                <div id="driverOption" class="user-type-option" onclick="selectUserType('driver')">
+                    <i class="fas fa-truck"></i> Repartidor
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="username">Usuario</label>
+                <input type="text" id="username" class="form-control" placeholder="Ingresa tu usuario">
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Contraseña</label>
+                <input type="password" id="password" class="form-control" placeholder="Ingresa tu contraseña">
+            </div>
+            
+            <button class="btn btn-primary" onclick="loginSupabase()">
+                <i class="fas fa-sign-in-alt"></i> Iniciar Sesión
+            </button>
+            
+            <div class="mt-20" style="font-size: 12px; color: var(--gray);">
+                <div id="connectionStatus" class="alert alert-info">
+                    <i class="fas fa-wifi"></i> Conectando a Supabase...
+                </div>                
+            </div>
+        </div>
+    </div>
+    
+    <!-- Admin App -->
+    <div id="adminApp" class="app-container hidden">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h3><i class="fas fa-truck-fast"></i> <span>Delivery Routes</span></h3>
+            </div>
+            
+            <div class="sidebar-menu">
+                <a href="#" class="menu-item active" onclick="showSection('dashboard')">
+                    <i class="fas fa-home"></i> <span>Dashboard</span>
+                </a>
+                <a href="#" class="menu-item" onclick="showSection('routes')">
+                    <i class="fas fa-route"></i> <span>Rutas</span>
+                </a>
+                <a href="#" class="menu-item" onclick="showSection('deliveries')">
+                    <i class="fas fa-package"></i> <span>Entregas</span>
+                </a>
+                <a href="#" class="menu-item" onclick="showSection('drivers')">
+                    <i class="fas fa-users"></i> <span>Repartidores</span>
+                </a>
+                <a href="#" class="menu-item" onclick="showSection('settings')">
+                    <i class="fas fa-cog"></i> <span>Ajustes</span>
+                </a>
+            </div>
+            
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <div class="avatar">A</div>
+                    <div class="user-name">Admin</div>
+                </div>
+                <button class="btn btn-sm btn-danger" onclick="logoutSupabase()">
+                    <i class="fas fa-sign-out-alt"></i> <span>Salir</span>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Dashboard Section -->
+            <div id="dashboardSection" class="section">
+                <div class="header">
+                    <div class="page-title">
+                        <h1>Dashboard</h1>
+                        <p>Resumen de entregas y rutas</p>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-secondary" onclick="loadDataFromSupabase()" title="Recargar datos desde Supabase">
+                            <i class="fas fa-sync-alt"></i> Recargar desde Supabase
+                        </button>
+                        <button class="btn btn-primary" onclick="openRouteModal()">
+                            <i class="fas fa-plus"></i> Nueva Ruta
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="dashboard-cards">
+                    <div class="card">
+                        <div class="card-icon blue">
+                            <i class="fas fa-route"></i>
+                        </div>
+                        <h3 id="totalRoutes">0</h3>
+                        <p>Rutas Activas</p>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-icon purple">
+                            <i class="fas fa-package"></i>
+                        </div>
+                        <h3 id="totalDeliveries">0</h3>
+                        <p>Entregas Totales</p>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-icon green">
+                            <i class="fas fa-truck"></i>
+                        </div>
+                        <h3 id="totalDrivers">0</h3>
+                        <p>Repartidores</p>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-icon blue">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <h3 id="completedDeliveries">0</h3>
+                        <p>Entregas Completadas</p>
+                    </div>
+                </div>
+                
+                <div class="routes-section">
+                    <div class="section-header">
+                        <h2>Rutas Activas</h2>
+                        <button class="btn btn-secondary" onclick="showSection('routes')">
+                            <i class="fas fa-eye"></i> Ver Todas
+                        </button>
+                    </div>
+                    
+                    <div id="activeRoutesGrid" class="routes-grid">
+                        <!-- Las rutas activas se cargarán aquí -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Routes Section -->
+            <div id="routesSection" class="section hidden">
+                <div class="header">
+                    <div class="page-title">
+                        <h1>Gestión de Rutas</h1>
+                        <p>Crea, edita y organiza tus rutas de entrega</p>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-secondary" onclick="loadDataFromSupabase()">
+                            <i class="fas fa-sync-alt"></i> Recargar desde Supabase
+                        </button>
+                        <button class="btn btn-primary" onclick="openRouteModal()">
+                            <i class="fas fa-plus"></i> Nueva Ruta
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="allRoutesGrid" class="routes-grid">
+                    <!-- Todas las rutas se cargarán aquí -->
+                </div>
+            </div>
+            
+            <!-- Deliveries Section -->
+            <div id="deliveriesSection" class="section hidden">
+                <div class="header">
+                    <div class="page-title">
+                        <h1>Gestión de Entregas</h1>
+                        <p>Administra todas las entregas programadas</p>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-secondary" onclick="loadDataFromSupabase()">
+                            <i class="fas fa-sync-alt"></i> Recargar desde Supabase
+                        </button>
+                        <button class="btn btn-primary" onclick="openDeliveryModal()">
+                            <i class="fas fa-plus"></i> Nueva Entrega
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="delivery-list">
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Cliente</th>
+                                    <th>Dirección</th>
+                                    <th>Teléfono</th>
+                                    <th>Ruta</th>
+                                    <th>Comanda</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="deliveriesTable">
+                                <!-- Las entregas se cargarán aquí -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Drivers Section -->
+            <div id="driversSection" class="section hidden">
+                <div class="header">
+                    <div class="page-title">
+                        <h1>Repartidores</h1>
+                        <p>Gestiona los repartidores del sistema</p>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-secondary" onclick="loadDataFromSupabase()">
+                            <i class="fas fa-sync-alt"></i> Recargar desde Supabase
+                        </button>
+                        <button class="btn btn-primary" onclick="openDriverModal()">
+                            <i class="fas fa-plus"></i> Nuevo Repartidor
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="dashboard-cards" id="driversGrid">
+                    <!-- Los repartidores se cargarán aquí -->
+                </div>
+            </div>
+            
+            <!-- Settings Section -->
+            <div id="settingsSection" class="section hidden">
+                <div class="header">
+                    <div class="page-title">
+                        <h1>Ajustes del Sistema</h1>
+                        <p>Configuración general de la aplicación</p>
+                    </div>
+                </div>
+                
+                <div class="routes-section">
+                    <h3 class="mb-20">Preferencias</h3>
+                    
+                    <div class="form-group">
+                        <label>Notificaciones por Email</label>
+                        <div>
+                            <input type="checkbox" id="emailNotifications" checked> Activar notificaciones
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Mapa por defecto</label>
+                        <select class="form-control">
+                            <option>Google Maps</option>
+                            <option>OpenStreetMap</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Idioma</label>
+                        <select class="form-control">
+                            <option>Español</option>
+                            <option>Inglés</option>
+                            <option>Catalán</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mt-30">
+                        <h3>Gestión de Datos</h3>
+                        <div class="flex gap-10" style="flex-wrap: wrap; margin-top: 15px;">
+                            <button class="btn btn-primary" onclick="exportData()">
+                                <i class="fas fa-download"></i> Exportar Datos
+                            </button>
+                            <button class="btn btn-secondary" onclick="importData()">
+                                <i class="fas fa-upload"></i> Importar Datos
+                            </button>
+                            <button class="btn btn-warning" onclick="clearAllData()">
+                                <i class="fas fa-trash-alt"></i> Limpiar Datos Locales
+                            </button>
+                            <button class="btn btn-info" onclick="showSystemInfo()">
+                                <i class="fas fa-info-circle"></i> Información del Sistema
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-30">
+                        <h3>Información del Sistema</h3>
+                        <div class="alert alert-info">
+                            <strong>Versión:</strong> 3.0 (Supabase)<br>
+                            <strong>Almacenamiento:</strong> Supabase + localStorage<br>
+                            <strong>Modo offline:</strong> Soportado<br>
+                            <strong>Sincronización:</strong> Automática cuando hay conexión
+                        </div>
+                    </div>
+                    
+                    <button class="btn btn-primary mt-20">Guardar Cambios</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Driver App -->
+    <div id="driverApp" class="app-container hidden">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h3><i class="fas fa-truck-fast"></i> <span>Repartidor</span></h3>
+            </div>
+            
+            <div class="sidebar-menu">
+                <a href="#" class="menu-item active" onclick="showDriverSection('myRoutes')">
+                    <i class="fas fa-route"></i> <span>Mis Rutas</span>
+                </a>
+                <a href="#" class="menu-item" onclick="showDriverSection('myDeliveries')">
+                    <i class="fas fa-package"></i> <span>Mis Entregas</span>
+                </a>
+                <a href="#" class="menu-item" onclick="showDriverSection('driverProfile')">
+                    <i class="fas fa-user"></i> <span>Mi Perfil</span>
+                </a>
+            </div>
+            
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <div class="avatar">R</div>
+                    <div class="user-name">Repartidor</div>
+                </div>
+                <button class="btn btn-sm btn-danger" onclick="logoutSupabase()">
+                    <i class="fas fa-sign-out-alt"></i> <span>Salir</span>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- My Routes Section -->
+            <div id="myRoutesSection" class="section">
+                <div class="header">
+                    <div class="page-title">
+                        <h1>Mis Rutas Asignadas</h1>
+                        <p>Rutas asignadas para hoy</p>
+                    </div>
+                    <div class="header-actions">
+                        <span id="driverDate" class="btn btn-secondary"></span>
+                        <button class="btn btn-sm btn-info" onclick="loadDataFromSupabase()" title="Recargar datos">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="driverRoutesGrid" class="routes-grid">
+                    <!-- Las rutas del repartidor se cargarán aquí -->
+                </div>
+            </div>
+            
+            <!-- My Deliveries Section -->
+            <div id="myDeliveriesSection" class="section hidden">
+                <div class="header">
+                    <div class="page-title">
+                        <h1>Mis Entregas</h1>
+                        <p>Todas las entregas asignadas</p>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-sm btn-info" onclick="loadDataFromSupabase()" title="Recargar datos">
+                            <i class="fas fa-sync-alt"></i> Recargar
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="driverDeliveriesList" class="delivery-list">
+                    <!-- Las entregas del repartidor se cargarán aquí -->
+                </div>
+            </div>
+            
+            <!-- Driver Profile Section -->
+            <div id="driverProfileSection" class="section hidden">
+                <div class="header">
+                    <div class="page-title">
+                        <h1>Mi Perfil</h1>
+                        <p>Información personal y estadísticas</p>
+                    </div>
+                </div>
+                
+                <div class="routes-section">
+                    <div class="user-info mb-30" style="justify-content: flex-start;">
+                        <div class="avatar" style="width: 80px; height: 80px; font-size: 32px;">R</div>
+                        <div>
+                            <h2 id="driverProfileName">Repartidor</h2>
+                            <p id="driverProfileEmail">correo@example.com</p>
+                            <p><i class="fas fa-phone"></i> <span id="driverProfilePhone">+34 600 123 456</span></p>
+                        </div>
+                    </div>
+                    
+                    <div class="dashboard-cards">
+                        <div class="card">
+                            <h3 id="driverWeeklyDeliveries">0</h3>
+                            <p>Entregas esta semana</p>
+                        </div>
+                        
+                        <div class="card">
+                            <h3 id="driverSuccessRate">0%</h3>
+                            <p>Tasa de éxito</p>
+                        </div>
+                        
+                        <div class="card">
+                            <h3 id="driverHours">0</h3>
+                            <p>Horas trabajadas</p>
+                        </div>
+                    </div>
+                    
+                    <h3 class="mt-20">Configuración</h3>
+                    <div class="form-group">
+                        <label>Notificaciones push</label>
+                        <div>
+                            <input type="checkbox" id="pushNotifications" checked> Activar notificaciones
+                        </div>
+                    </div>
+                    
+                    <button class="btn btn-primary">Guardar Cambios</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modals -->
+    <!-- Route Modal -->
+    <div id="routeModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="routeModalTitle">Nueva Ruta</h3>
+                <button class="close-btn" onclick="closeRouteModal()">&times;</button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="form-group mb-20">
+                    <label for="routeName">Nombre de la Ruta</label>
+                    <input type="text" id="routeName" class="form-control" placeholder="Ej: Ruta Centro - Mañana">
+                </div>
+                
+                <div class="form-row mb-20">
+                    <div class="form-group">
+                        <label for="routeDriver">Repartidor Asignado</label>
+                        <select id="routeDriver" class="form-control">
+                            <!-- Los repartidores se cargarán dinámicamente -->
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="routeStatus">Estado</label>
+                        <select id="routeStatus" class="form-control">
+                            <option value="active">Activa</option>
+                            <option value="pending">Pendiente</option>
+                            <option value="completed">Completada</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group mb-20">
+                    <label for="routeDescription">Descripción</label>
+                    <textarea id="routeDescription" class="form-control" rows="3" placeholder="Descripción de la ruta..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>Entregas en esta ruta</label>
+                    <div id="routeDeliveriesList">
+                        <!-- Las entregas asignadas a esta ruta se mostrarán aquí -->
+                    </div>
+                </div>
+                
+                <!-- Entregas disponibles para asignar -->
+                <div id="availableDeliveries"></div>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeRouteModal()">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveRoute()">Guardar Ruta</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Delivery Modal -->
+    <div id="deliveryModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="deliveryModalTitle">Nueva Entrega</h3>
+                <button class="close-btn" onclick="closeDeliveryModal()">&times;</button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="form-group mb-20">
+                    <label for="deliveryClient">Cliente</label>
+                    <input type="text" id="deliveryClient" class="form-control" placeholder="Nombre del cliente">
+                </div>
+                
+                <div class="form-group mb-20">
+                    <label for="deliveryAddress">Dirección</label>
+                    <input type="text" id="deliveryAddress" class="form-control" placeholder="Dirección completa">
+                </div>
+                
+                <div class="form-row mb-20">
+                    <div class="form-group">
+                        <label for="deliveryPhone">Teléfono</label>
+                        <input type="text" id="deliveryPhone" class="form-control" placeholder="Teléfono de contacto">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="deliveryRoute">Ruta Asignada</label>
+                        <select id="deliveryRoute" class="form-control">
+                            <!-- Las rutas se cargarán dinámicamente -->
+                            <option value="">Sin asignar</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group mb-20">
+                    <label for="deliveryOrder">Comanda</label>
+                    <textarea id="deliveryOrder" class="form-control" rows="3" placeholder="Detalles de la comanda..."></textarea>
+                </div>
+                
+                <div class="form-group mb-20">
+                    <label for="deliveryObservations">Observaciones</label>
+                    <textarea id="deliveryObservations" class="form-control" rows="2" placeholder="Observaciones adicionales..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="deliveryStatus">Estado</label>
+                    <select id="deliveryStatus" class="form-control">
+                        <option value="pending">Pendiente</option>
+                        <option value="in_progress">En camino</option>
+                        <option value="completed">Completada</option>
+                    </select>
+                </div>
+                
+                <!-- Guía de rutas -->
+                <div id="routeGuidance"></div>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeDeliveryModal()">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveDelivery()">Guardar Entrega</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Driver Modal -->
+    <div id="driverModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="driverModalTitle">Nuevo Repartidor</h3>
+                <button class="close-btn" onclick="closeDriverModal()">&times;</button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="form-group mb-20">
+                    <label for="driverName">Nombre Completo</label>
+                    <input type="text" id="driverName" class="form-control" placeholder="Nombre del repartidor">
+                </div>
+                
+                <div class="form-row mb-20">
+                    <div class="form-group">
+                        <label for="driverEmail">Email</label>
+                        <input type="email" id="driverEmail" class="form-control" placeholder="email@ejemplo.com">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="driverPhone">Teléfono</label>
+                        <input type="text" id="driverPhone" class="form-control" placeholder="Teléfono de contacto">
+                    </div>
+                </div>
+                
+                <div class="form-group mb-20">
+                    <label for="driverVehicle">Vehículo</label>
+                    <select id="driverVehicle" class="form-control">
+                        <option>Motocicleta</option>
+                        <option>Coche</option>
+                        <option>Furgoneta</option>
+                        <option>Bicicleta</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="driverLicense">Licencia / Identificación</label>
+                    <input type="text" id="driverLicense" class="form-control" placeholder="Número de licencia">
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeDriverModal()">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveDriver()">Guardar Repartidor</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Comanda Completa -->
+    <div id="comandaModal" class="comanda-full">
+        <div class="comanda-modal">
+            <h3>Comanda Completa</h3>
+            <button class="comanda-close" onclick="closeComandaModal()">&times;</button>
+            
+            <div class="form-group mb-20">
+                <label>Cliente</label>
+                <div id="comandaClient" class="form-control" style="background-color: #f8f9fa; font-weight: 500;"></div>
+            </div>
+            
+            <div class="form-group mb-20">
+                <label>Dirección</label>
+                <div id="comandaAddress" class="form-control" style="background-color: #f8f9fa;"></div>
+            </div>
+            
+            <div class="form-group mb-20">
+                <label>Comanda</label>
+                <div id="comandaContent" class="comanda-content"></div>
+            </div>
+            
+            <div class="form-group mb-20">
+                <label>Observaciones</label>
+                <div id="comandaObservations" class="form-control" style="background-color: #f8f9fa; min-height: 60px;"></div>
+            </div>
+            
+            <div class="form-group">
+                <label>Estado</label>
+                <select id="comandaStatus" class="form-control" onchange="updateDeliveryStatusFromModal()">
+                    <option value="pending">Pendiente</option>
+                    <option value="in_progress">En camino</option>
+                    <option value="completed">Completada</option>
+                </select>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeComandaModal()">Cerrar</button>
+                <button class="btn btn-primary" onclick="saveComandaChanges()">Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts ACTUALIZADOS -->
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- Configuración de Supabase -->
+    <script src="js/supabase.js"></script>
+    
+    <!-- Nuevos módulos con Supabase -->
+    <script src="js/auth-supabase.js"></script>
+    <script src="js/dataManager-supabase.js"></script>
+    <script src="js/uiManager.js"></script>
+    <script src="js/routes-supabase.js"></script>
+    <script src="js/deliveries-supabase.js"></script>
+    <script src="js/drivers-supabase.js"></script>
+    <script src="js/manualGuide.js"></script>
+    
+    <!-- App principal actualizada -->
+    <script src="js/app-supabase.js"></script>
+</body>
+</html>
