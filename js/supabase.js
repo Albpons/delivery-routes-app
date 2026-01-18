@@ -1,22 +1,28 @@
-// supabase.js - Configuración y funciones base de Supabase
-const SUPABASE_URL = 'https://gryjdkuexbepehmtcrum.supabase.co'; // Reemplaza con tu URL
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdyeWpka3VleGJlcGVobXRjcnVtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3MDY3NzgsImV4cCI6MjA4NDI4Mjc3OH0.gZMljLMfIcrfcddM9kAHdo8XB0SWjA8BBow3TowF_UY'; // Reemplaza con tu clave
+// supabase.js - Configuración y funciones base de Supabase - CORREGIDO
+const SUPABASE_URL = 'https://gryjdkuexbepehmtcrum.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdyeWpka3VleGJlcGVobXRjcnVtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3MDY3NzgsImV4cCI6MjA4NDI4Mjc3OH0.gZMljLMfIcrfcddM9kAHdo8XB0SWjA8BBow3TowF_UY';
 
-// Inicializar Supabase
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Crear cliente de Supabase solo si no existe
+if (!window.supabase) {
+    window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
 
 // Funciones de utilidad para Supabase
 const SupabaseManager = {
     // Verificar conexión
     async checkConnection() {
         try {
-            const { data, error } = await supabase
-                .from('routes')
-                .select('count')
-                .limit(1);
+            // Verificar conexión simple
+            const { data, error } = await window.supabase.auth.getSession();
             
-            return { success: !error, error };
+            if (error) {
+                console.error('Error de conexión Supabase:', error);
+                return { success: false, error };
+            }
+            
+            return { success: true };
         } catch (error) {
+            console.error('Excepción en checkConnection:', error);
             return { success: false, error };
         }
     },
@@ -26,7 +32,6 @@ const SupabaseManager = {
         console.log('🔄 Sincronizando datos locales con Supabase...');
         
         try {
-            // Obtener datos locales
             const localRoutes = JSON.parse(localStorage.getItem('delivery_routes') || '[]');
             const localDeliveries = JSON.parse(localStorage.getItem('delivery_deliveries') || '[]');
             const localDrivers = JSON.parse(localStorage.getItem('delivery_drivers') || '[]');
@@ -36,66 +41,75 @@ const SupabaseManager = {
             // Sincronizar rutas
             if (localRoutes.length > 0) {
                 for (const route of localRoutes) {
-                    const { error } = await supabase
-                        .from('routes')
-                        .upsert({
-                            id: route.id,
-                            name: route.name,
-                            driver: route.driver,
-                            status: route.status,
-                            deliveries: route.deliveries,
-                            completed: route.completed,
-                            description: route.description,
-                            created_at: route.createdAt || new Date().toISOString(),
-                            updated_at: new Date().toISOString()
-                        }, { onConflict: 'id' });
-                    
-                    if (!error) syncedCount++;
+                    try {
+                        const { error } = await window.supabase
+                            .from('routes')
+                            .upsert({
+                                id: route.id,
+                                name: route.name,
+                                driver: route.driver,
+                                status: route.status,
+                                deliveries: route.deliveries,
+                                completed: route.completed,
+                                description: route.description,
+                                created_at: route.createdAt || new Date().toISOString()
+                            }, { onConflict: 'id' });
+                        
+                        if (!error) syncedCount++;
+                    } catch (e) {
+                        console.error('Error sincronizando ruta:', e);
+                    }
                 }
             }
             
             // Sincronizar entregas
             if (localDeliveries.length > 0) {
                 for (const delivery of localDeliveries) {
-                    const { error } = await supabase
-                        .from('deliveries')
-                        .upsert({
-                            id: delivery.id,
-                            client: delivery.client,
-                            address: delivery.address,
-                            phone: delivery.phone,
-                            route: delivery.route,
-                            order: delivery.order,
-                            observations: delivery.observations,
-                            status: delivery.status,
-                            created_at: delivery.createdAt || new Date().toISOString(),
-                            updated_at: new Date().toISOString()
-                        }, { onConflict: 'id' });
-                    
-                    if (!error) syncedCount++;
+                    try {
+                        const { error } = await window.supabase
+                            .from('deliveries')
+                            .upsert({
+                                id: delivery.id,
+                                client: delivery.client,
+                                address: delivery.address,
+                                phone: delivery.phone,
+                                route: delivery.route,
+                                order: delivery.order,
+                                observations: delivery.observations,
+                                status: delivery.status,
+                                created_at: delivery.createdAt || new Date().toISOString()
+                            }, { onConflict: 'id' });
+                        
+                        if (!error) syncedCount++;
+                    } catch (e) {
+                        console.error('Error sincronizando entrega:', e);
+                    }
                 }
             }
             
             // Sincronizar repartidores
             if (localDrivers.length > 0) {
                 for (const driver of localDrivers) {
-                    const { error } = await supabase
-                        .from('drivers')
-                        .upsert({
-                            id: driver.id,
-                            name: driver.name,
-                            username: driver.username,
-                            email: driver.email,
-                            phone: driver.phone,
-                            vehicle: driver.vehicle,
-                            license: driver.license,
-                            deliveries: driver.deliveries,
-                            status: driver.status,
-                            created_at: new Date().toISOString(),
-                            updated_at: new Date().toISOString()
-                        }, { onConflict: 'id' });
-                    
-                    if (!error) syncedCount++;
+                    try {
+                        const { error } = await window.supabase
+                            .from('drivers')
+                            .upsert({
+                                id: driver.id,
+                                name: driver.name,
+                                username: driver.username,
+                                email: driver.email,
+                                phone: driver.phone,
+                                vehicle: driver.vehicle,
+                                license: driver.license,
+                                deliveries: driver.deliveries,
+                                status: driver.status,
+                                created_at: new Date().toISOString()
+                            }, { onConflict: 'id' });
+                        
+                        if (!error) syncedCount++;
+                    } catch (e) {
+                        console.error('Error sincronizando repartidor:', e);
+                    }
                 }
             }
             
@@ -138,7 +152,7 @@ const SupabaseManager = {
 
     // Suscribirse a cambios en tiempo real
     subscribeToChanges(table, event, callback) {
-        return supabase
+        return window.supabase
             .channel('public:' + table)
             .on('postgres_changes', 
                 { event: event, schema: 'public', table: table }, 
@@ -149,5 +163,4 @@ const SupabaseManager = {
 };
 
 // Exportar para uso global
-window.supabase = supabase;
 window.SupabaseManager = SupabaseManager;
