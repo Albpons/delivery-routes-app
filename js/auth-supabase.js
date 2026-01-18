@@ -38,13 +38,23 @@ const AuthManagerSupabase = {
                 .single();
             
             if (error) {
-                // Si no existe, crear usuario básico
-                return {
-                    id: 0,
-                    email: email,
-                    name: email.split('@')[0],
-                    role: email === 'admin@deliveryroutes.com' ? 'admin' : 'driver'
-                };
+                // Si no existe, buscar en drivers
+                const { data: driver } = await supabase
+                    .from('drivers')
+                    .select('*')
+                    .eq('email', email)
+                    .single();
+                
+                if (driver) {
+                    return {
+                        id: driver.id,
+                        name: driver.name,
+                        email: driver.email,
+                        role: 'driver',
+                        driverData: driver
+                    };
+                }
+                return null;
             }
             
             return data;
