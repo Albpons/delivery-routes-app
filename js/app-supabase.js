@@ -1,255 +1,26 @@
-// app-supabase.js - Archivo principal actualizado para Supabase
-
-// Función para esperar a que un objeto esté disponible
-async function waitForObject(objName, timeout = 10000) {
-    return new Promise((resolve, reject) => {
-        if (window[objName]) {
-            resolve(window[objName]);
-            return;
-        }
-        
-        const startTime = Date.now();
-        const interval = setInterval(() => {
-            if (window[objName]) {
-                clearInterval(interval);
-                resolve(window[objName]);
-            } else if (Date.now() - startTime > timeout) {
-                clearInterval(interval);
-                console.warn(`⚠️ ${objName} no disponible después de ${timeout}ms`);
-                resolve(null);
-            }
-        }, 100);
-    });
-}
-
-// Verificar conexión a Supabase
-async function checkSupabaseConnection() {
-    const statusElement = document.getElementById('connectionStatus');
-    if (!statusElement) return;
-    
-    try {
-        // Esperar a que Supabase esté disponible
-        const supabase = await waitForObject('supabase', 3000);
-        
-        if (!supabase) {
-            statusElement.innerHTML = '<i class="fas fa-wifi-slash"></i> Modo offline - usando datos locales';
-            statusElement.className = 'alert alert-warning';
-            console.log('🔶 Supabase no disponible, modo offline activado');
-            return false;
-        }
-        
-        // Probar conexión
-        const { data, error } = await supabase.auth.getSession();
-        
-        if (error) {
-            console.error('❌ Error de conexión Supabase:', error);
-            statusElement.innerHTML = '<i class="fas fa-wifi-slash"></i> Error de conexión - modo offline';
-            statusElement.className = 'alert alert-danger';
-            return false;
-        }
-        
-        statusElement.innerHTML = '<i class="fas fa-wifi"></i> Conectado a Supabase';
-        statusElement.className = 'alert alert-success';
-        console.log('✅ Conexión Supabase establecida');
-        return true;
-        
-    } catch (error) {
-        console.error('❌ Error verificando conexión:', error);
-        statusElement.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Modo offline - usando datos locales';
-        statusElement.className = 'alert alert-warning';
-        return false;
-    }
-}
-
-// Cargar datos iniciales
-async function loadInitialData() {
-    try {
-        console.log('📊 Cargando datos iniciales...');
-        
-        // Verificar si DataManagerSupabase está disponible
-        const dataManager = await waitForObject('DataManagerSupabase', 3000);
-        
-        if (!dataManager) {
-            console.warn('⚠️ DataManagerSupabase no disponible, cargando datos locales');
-            return loadLocalData();
-        }
-        
-        // Cargar datos desde Supabase
-        const data = await dataManager.loadInitialData();
-        console.log(`✅ Datos cargados: ${data.routes.length} rutas, ${data.deliveries.length} entregas, ${data.drivers.length} repartidores`);
-        
-        return data;
-        
-    } catch (error) {
-        console.error('❌ Error cargando datos iniciales:', error);
-        return loadLocalData();
-    }
-}
-
-// Cargar datos locales como fallback
-function loadLocalData() {
-    console.log('📁 Cargando datos desde localStorage...');
-    
-    const routes = JSON.parse(localStorage.getItem('delivery_routes') || '[]');
-    const deliveries = JSON.parse(localStorage.getItem('delivery_deliveries') || '[]');
-    const drivers = JSON.parse(localStorage.getItem('delivery_drivers') || '[]');
-    
-    // Si no hay datos locales, cargar drivers.json como fallback
-    if (drivers.length === 0) {
-        try {
-            // Intentar cargar drivers.json desde archivo
-            fetch('drivers.json')
-                .then(response => response.json())
-                .then(data => {
-                    console.log('📥 Drivers cargados desde drivers.json:', data.length);
-                    localStorage.setItem('delivery_drivers', JSON.stringify(data));
-                    
-                    // Actualizar UI si es necesario
-                    if (window.UIManager && window.DriverManagerSupabase) {
-                        setTimeout(() => {
-                            DriverManagerSupabase.loadDrivers();
-                        }, 1000);
-                    }
-                })
-                .catch(e => console.warn('No se pudo cargar drivers.json:', e));
-        } catch (e) {
-            console.warn('No se pudo cargar drivers.json:', e);
-        }
-    }
-    
-    console.log(`📊 Datos locales: ${routes.length} rutas, ${deliveries.length} entregas, ${drivers.length} repartidores`);
-    
-    return { routes, deliveries, drivers };
-}
-
-// Asignar eventos globales
-function assignGlobalEvents() {
-    console.log('🔗 Asignando eventos globales...');
-    
-    // Evento para recargar datos desde Supabase
-    window.loadDataFromSupabase = async function() {
-        console.log('🔄 Recargando datos desde Supabase...');
-        
-        if (window.UIManager) {
-            UIManager.showNotification('🔄 Recargando datos desde Supabase...', 'info');
-        }
-        
-        try {
-            const data = await loadInitialData();
-            
-            if (window.UIManager) {
-                UIManager.showNotification(
-                    `✅ Datos recargados: ${data.routes.length} rutas, ${data.deliveries.length} entregas`,
-                    'success'
-                );
-                
-                // Recargar vistas según el usuario actual
-                if (window.AuthManagerSupabase && AuthManagerSupabase.currentUser) {
-                    if (AuthManagerSupabase.currentUser.role === 'admin') {
-                        UIManager.loadDashboard();
-                        
-                        if (window.RouteManagerSupabase) RouteManagerSupabase.loadRoutes();
-                        if (window.DeliveryManagerSupabase) DeliveryManagerSupabase.loadDeliveries();
-                        if (window.DriverManagerSupabase) DriverManagerSupabase.loadDrivers();
-                    } else {
-                        UIManager.loadDriverRoutes();
-                        UIManager.loadDriverDeliveries();
-                        UIManager.updateDriverProfile();
-                    }
-                }
-            }
-            
-        } catch (error) {
-            console.error('Error recargando datos:', error);
-            if (window.UIManager) {
-                UIManager.showNotification('❌ Error recargando datos: ' + error.message, 'danger');
-            }
-        }
-    };
-    
-    // Reemplazar la función original
-    window.loadDataFromFiles = window.loadDataFromSupabase;
-    
-    // Función para limpiar datos locales
-    window.clearAllData = function() {
-        if (confirm('¿Estás seguro de que quieres limpiar todos los datos locales?\n\nEsto eliminará: rutas, entregas y repartidores guardados localmente.')) {
-            localStorage.removeItem('delivery_routes');
-            localStorage.removeItem('delivery_deliveries');
-            localStorage.removeItem('delivery_drivers');
-            localStorage.removeItem('currentUser');
-            
-            if (window.UIManager) {
-                UIManager.showNotification('🗑️ Datos locales eliminados', 'success');
-            }
-            
-            // Recargar la página después de 2 segundos
-            setTimeout(() => {
-                location.reload();
-            }, 2000);
-        }
-    };
-    
-    // Función para mostrar información del sistema
-    window.showSystemInfo = function() {
-        if (window.UIManager && UIManager.showSystemInfo) {
-            UIManager.showSystemInfo();
-        } else {
-            const info = `
-                <div style="padding: 20px;">
-                    <h3>Información del Sistema</h3>
-                    <p><strong>Modo:</strong> ${window.supabase ? 'Supabase' : 'Offline'}</p>
-                    <p><strong>Conexión:</strong> ${navigator.onLine ? 'Online' : 'Offline'}</p>
-                    <p><strong>Datos locales:</strong></p>
-                    <ul>
-                        <li>Rutas: ${JSON.parse(localStorage.getItem('delivery_routes') || '[]').length}</li>
-                        <li>Entregas: ${JSON.parse(localStorage.getItem('delivery_deliveries') || '[]').length}</li>
-                        <li>Repartidores: ${JSON.parse(localStorage.getItem('delivery_drivers') || '[]').length}</li>
-                    </ul>
-                </div>
-            `;
-            
-            alert(info);
-        }
-    };
-}
+// app-supabase.js - Archivo principal simplificado
 
 // Inicializar la aplicación
 async function initApp() {
     console.log('🚀 Inicializando Delivery Routes App...');
     
     // Establecer admin como tipo de usuario por defecto
-    const adminOption = document.getElementById('adminOption');
-    const driverOption = document.getElementById('driverOption');
+    selectUserType('admin');
     
-    if (adminOption && driverOption) {
-        adminOption.classList.add('active');
-        driverOption.classList.remove('active');
-    }
+    // Verificar conexión a Supabase (pero no es crítica para el login)
+    await checkSupabaseConnection();
     
-    // Verificar conexión a Supabase
-    const isConnected = await checkSupabaseConnection();
-    
-    if (!isConnected) {
-        console.log('🔶 Modo offline activado');
-    }
-    
-    // Esperar a que los módulos necesarios estén cargados
-    await Promise.all([
-        waitForObject('AuthManagerSupabase', 5000),
-        waitForObject('UIManager', 5000)
-    ]);
-    
-    // Intentar autenticación automática
+    // Intentar autenticación automática desde localStorage
     if (window.AuthManagerSupabase) {
         const autoLogin = await AuthManagerSupabase.init();
         
         if (autoLogin) {
             console.log('✅ Sesión recuperada automáticamente');
+            console.log('Usuario:', AuthManagerSupabase.currentUser?.name);
         } else {
             console.log('🔐 Inicia sesión manualmente');
+            showLoginInstructions();
         }
-    } else {
-        console.warn('⚠️ AuthManagerSupabase no disponible');
     }
     
     // Asignar eventos globales
@@ -258,21 +29,183 @@ async function initApp() {
     console.log('✅ Aplicación inicializada');
 }
 
-// Función para exportar datos a JSON
+// Mostrar instrucciones de login
+function showLoginInstructions() {
+    setTimeout(() => {
+        const loginCard = document.querySelector('.login-card');
+        if (loginCard) {
+            const instructions = document.createElement('div');
+            instructions.className = 'alert alert-info mt-20';
+            instructions.style.fontSize = '13px';
+            instructions.innerHTML = `
+                <strong>👑 Credenciales Administrador:</strong><br>
+                Usuario: <code>admin</code><br>
+                Contraseña: <code>admin123</code>
+            `;
+            loginCard.appendChild(instructions);
+        }
+    }, 1500);
+}
+
+// Verificar conexión a Supabase (modo informativo)
+async function checkSupabaseConnection() {
+    const statusElement = document.getElementById('connectionStatus');
+    if (!statusElement) return;
+    
+    try {
+        if (window.supabase) {
+            const { data, error } = await window.supabase.auth.getSession();
+            
+            if (!error) {
+                statusElement.innerHTML = '<i class="fas fa-wifi"></i> Conectado a Supabase';
+                statusElement.className = 'alert alert-success';
+                return true;
+            }
+        }
+        
+        // Modo offline o sin Supabase
+        statusElement.innerHTML = '<i class="fas fa-database"></i> Modo local activo';
+        statusElement.className = 'alert alert-info';
+        return false;
+        
+    } catch (error) {
+        console.log('🔶 Sin conexión a Supabase, modo local activado');
+        statusElement.innerHTML = '<i class="fas fa-database"></i> Modo local activo';
+        statusElement.className = 'alert alert-info';
+        return false;
+    }
+}
+
+// Asignar eventos globales
+function assignGlobalEvents() {
+    console.log('🔗 Asignando eventos globales...');
+    
+    // Evento para recargar datos
+    window.loadDataFromSupabase = async function() {
+        console.log('🔄 Recargando datos...');
+        
+        if (window.UIManager) {
+            UIManager.showNotification('🔄 Recargando datos...', 'info');
+        }
+        
+        try {
+            // Cargar según el usuario
+            if (window.AuthManagerSupabase && AuthManagerSupabase.currentUser) {
+                if (AuthManagerSupabase.currentUser.role === 'admin') {
+                    // Admin: intentar cargar de Supabase o local
+                    await loadAdminData();
+                } else {
+                    // Driver: cargar sus datos
+                    await loadDriverData();
+                }
+            }
+            
+            if (window.UIManager) {
+                UIManager.showNotification('✅ Datos recargados', 'success');
+            }
+            
+        } catch (error) {
+            console.error('Error recargando datos:', error);
+            if (window.UIManager) {
+                UIManager.showNotification('❌ Error recargando datos', 'danger');
+            }
+        }
+    };
+    
+    // Función para limpiar datos locales
+    window.clearAllData = function() {
+        if (confirm('¿Estás seguro de que quieres limpiar TODOS los datos locales?\n\nEsto eliminará rutas, entregas y repartidores guardados localmente.')) {
+            localStorage.removeItem('delivery_routes');
+            localStorage.removeItem('delivery_deliveries');
+            localStorage.removeItem('delivery_drivers');
+            
+            // No eliminar currentUser para mantener la sesión
+            // localStorage.removeItem('currentUser');
+            
+            if (window.UIManager) {
+                UIManager.showNotification('🗑️ Datos locales eliminados', 'success');
+            }
+            
+            // Recargar vistas
+            setTimeout(() => {
+                if (window.loadDataFromSupabase) {
+                    loadDataFromSupabase();
+                }
+            }, 1000);
+        }
+    };
+    
+    // Función para mostrar información del sistema
+    window.showSystemInfo = function() {
+        if (window.UIManager && UIManager.showSystemInfo) {
+            UIManager.showSystemInfo();
+        }
+    };
+}
+
+// Cargar datos para admin
+async function loadAdminData() {
+    try {
+        // Intentar con Supabase si está disponible
+        if (window.supabase && window.DataManagerSupabase) {
+            await DataManagerSupabase.loadInitialData();
+        }
+        
+        // Cargar UI
+        if (window.UIManager) {
+            await UIManager.loadDashboard();
+            
+            // Cargar vistas específicas
+            if (window.RouteManagerSupabase) {
+                setTimeout(() => RouteManagerSupabase.loadRoutes(), 300);
+            }
+            if (window.DeliveryManagerSupabase) {
+                setTimeout(() => DeliveryManagerSupabase.loadDeliveries(), 500);
+            }
+            if (window.DriverManagerSupabase) {
+                setTimeout(() => DriverManagerSupabase.loadDrivers(), 700);
+            }
+        }
+        
+    } catch (error) {
+        console.error('Error cargando datos admin:', error);
+        
+        // Fallback a datos locales
+        if (window.UIManager) {
+            UIManager.showNotification('⚠️ Usando datos locales', 'warning');
+        }
+    }
+}
+
+// Cargar datos para driver
+async function loadDriverData() {
+    try {
+        if (window.UIManager) {
+            await UIManager.loadDriverRoutes();
+            await UIManager.loadDriverDeliveries();
+            await UIManager.updateDriverProfile();
+        }
+    } catch (error) {
+        console.error('Error cargando datos driver:', error);
+    }
+}
+
+// Función para exportar datos
 window.exportData = async function() {
     try {
-        let routes, deliveries, drivers;
+        let routes = JSON.parse(localStorage.getItem('delivery_routes') || '[]');
+        let deliveries = JSON.parse(localStorage.getItem('delivery_deliveries') || '[]');
+        let drivers = JSON.parse(localStorage.getItem('delivery_drivers') || '[]');
         
-        // Intentar obtener datos de Supabase primero
-        if (window.DataManagerSupabase) {
-            routes = await DataManagerSupabase.getRoutesFromSupabase();
-            deliveries = await DataManagerSupabase.getDeliveriesFromSupabase();
-            drivers = await DataManagerSupabase.getDriversFromSupabase();
-        } else {
-            // Usar datos locales
-            routes = JSON.parse(localStorage.getItem('delivery_routes') || '[]');
-            deliveries = JSON.parse(localStorage.getItem('delivery_deliveries') || '[]');
-            drivers = JSON.parse(localStorage.getItem('delivery_drivers') || '[]');
+        // Si hay Supabase, intentar obtener datos actualizados
+        if (window.supabase && window.DataManagerSupabase) {
+            try {
+                routes = await DataManagerSupabase.getRoutesFromSupabase();
+                deliveries = await DataManagerSupabase.getDeliveriesFromSupabase();
+                drivers = await DataManagerSupabase.getDriversFromSupabase();
+            } catch (e) {
+                console.log('Usando datos locales para exportar');
+            }
         }
         
         const data = {
@@ -280,13 +213,14 @@ window.exportData = async function() {
             deliveries,
             drivers,
             exportDate: new Date().toISOString(),
-            source: window.supabase ? 'Supabase' : 'Local'
+            source: window.supabase ? 'Supabase' : 'Local',
+            admin: window.AuthManagerSupabase?.currentUser?.name || 'Desconocido'
         };
         
         const dataStr = JSON.stringify(data, null, 2);
         const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
         
-        const exportFileDefaultName = `delivery-routes-${new Date().toISOString().split('T')[0]}.json`;
+        const exportFileDefaultName = `delivery-data-${new Date().toISOString().split('T')[0]}.json`;
         
         const linkElement = document.createElement('a');
         linkElement.setAttribute('href', dataUri);
@@ -305,7 +239,7 @@ window.exportData = async function() {
     }
 };
 
-// Función para importar datos a Supabase
+// Función para importar datos
 window.importData = async function() {
     const input = document.createElement('input');
     input.type = 'file';
@@ -328,38 +262,41 @@ window.importData = async function() {
                     UIManager.showNotification('🔄 Importando datos...', 'info');
                 }
                 
-                // Importar datos según el modo
+                // Guardar en localStorage
+                if (data.routes) {
+                    localStorage.setItem('delivery_routes', JSON.stringify(data.routes));
+                }
+                
+                if (data.deliveries) {
+                    localStorage.setItem('delivery_deliveries', JSON.stringify(data.deliveries));
+                }
+                
+                if (data.drivers) {
+                    localStorage.setItem('delivery_drivers', JSON.stringify(data.drivers));
+                }
+                
+                // Intentar guardar en Supabase si está disponible
                 if (window.supabase && window.DataManagerSupabase) {
-                    // Importar a Supabase
-                    if (data.routes) {
-                        for (const route of data.routes) {
-                            await DataManagerSupabase.createRoute(route);
+                    try {
+                        if (data.routes) {
+                            for (const route of data.routes) {
+                                await DataManagerSupabase.createRoute(route);
+                            }
                         }
-                    }
-                    
-                    if (data.deliveries) {
-                        for (const delivery of data.deliveries) {
-                            await DataManagerSupabase.createDelivery(delivery);
+                        
+                        if (data.deliveries) {
+                            for (const delivery of data.deliveries) {
+                                await DataManagerSupabase.createDelivery(delivery);
+                            }
                         }
-                    }
-                    
-                    if (data.drivers) {
-                        for (const driver of data.drivers) {
-                            await DataManagerSupabase.createDriver(driver);
+                        
+                        if (data.drivers) {
+                            for (const driver of data.drivers) {
+                                await DataManagerSupabase.createDriver(driver);
+                            }
                         }
-                    }
-                } else {
-                    // Guardar localmente
-                    if (data.routes) {
-                        localStorage.setItem('delivery_routes', JSON.stringify(data.routes));
-                    }
-                    
-                    if (data.deliveries) {
-                        localStorage.setItem('delivery_deliveries', JSON.stringify(data.deliveries));
-                    }
-                    
-                    if (data.drivers) {
-                        localStorage.setItem('delivery_drivers', JSON.stringify(data.drivers));
+                    } catch (supabaseError) {
+                        console.warn('No se pudo guardar en Supabase, solo en local:', supabaseError);
                     }
                 }
                 
@@ -368,11 +305,11 @@ window.importData = async function() {
                 }
                 
                 // Recargar datos
-                if (window.loadDataFromSupabase) {
-                    setTimeout(() => {
+                setTimeout(() => {
+                    if (window.loadDataFromSupabase) {
                         loadDataFromSupabase();
-                    }, 1000);
-                }
+                    }
+                }, 1000);
                 
             } catch (error) {
                 console.error('Error importando datos:', error);
@@ -393,8 +330,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 500);
 });
 
-// Exportar funciones globales
-window.selectUserType = selectUserType;
+// Exportar funciones globales (mantener compatibilidad)
 window.showSection = function(sectionId) {
     if (window.UIManager && UIManager.showSection) {
         UIManager.showSection(sectionId);
