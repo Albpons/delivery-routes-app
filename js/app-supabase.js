@@ -37,11 +37,6 @@ function showLoginInstructions() {
             const instructions = document.createElement('div');
             instructions.className = 'alert alert-info mt-20';
             instructions.style.fontSize = '13px';
-            instructions.innerHTML = `
-                <strong>👑 Credenciales Administrador:</strong><br>
-                Usuario: <code>admin</code><br>
-                Contraseña: <code>admin123</code>
-            `;
             loginCard.appendChild(instructions);
         }
     }, 1500);

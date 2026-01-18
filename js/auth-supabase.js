@@ -499,7 +499,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(() => {
         const loginCard = document.querySelector('.login-card p');
         if (loginCard) {
-            loginCard.innerHTML += '<br><small style="font-size: 12px; color: #666;">Admin: <strong>admin / admin123</strong></small>';
+            loginCard.innerHTML += '<br><small style="font-size: 12px; color: #666;">Admin: <strong> / </strong></small>';
         }
     }, 1000);
 });
