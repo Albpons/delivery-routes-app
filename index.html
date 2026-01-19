@@ -289,7 +289,8 @@
                             </button>
                         </div>
                     </div>
-
+                    
+                    <!-- NUEVA SECCIÓN: Herramientas de Sincronización -->
                     <div class="mt-30">
                         <h3>Herramientas de Sincronización</h3>
                         <div class="flex gap-10" style="flex-wrap: wrap; margin-top: 15px;">
@@ -310,7 +311,8 @@
                             • <strong>Limpiar y Re-sincronizar:</strong> Borra todo local y vuelve a cargar desde Supabase
                         </div>
                     </div>
-
+                    
+                    <!-- NUEVA SECCIÓN: Herramientas de Rutas y Entregas -->
                     <div class="mt-30">
                         <h3>Herramientas de Rutas y Entregas</h3>
                         <div class="flex gap-10" style="flex-wrap: wrap; margin-top: 15px;">
@@ -329,6 +331,28 @@
                             1. Usa <strong>"Diagnosticar Problemas"</strong> para identificar entregas huérfanas<br>
                             2. Usa <strong>"Asignar Entregas Manualmente"</strong> para vincular entregas a rutas<br>
                             3. Usa <strong>"Reparar Relaciones"</strong> para corregir automáticamente problemas
+                        </div>
+                    </div>
+                    
+                    <!-- NUEVA SECCIÓN: Herramientas de Repartidores -->
+                    <div class="mt-30">
+                        <h3>Herramientas de Repartidores</h3>
+                        <div class="flex gap-10" style="flex-wrap: wrap; margin-top: 15px;">
+                            <button class="btn btn-info" onclick="showDriverDiagnosis()">
+                                <i class="fas fa-stethoscope"></i> Diagnóstico de Entregas
+                            </button>
+                            <button class="btn btn-primary" onclick="syncDriverAssignments()">
+                                <i class="fas fa-sync-alt"></i> Sincronizar Asignaciones
+                            </button>
+                            <button class="btn btn-warning" onclick="DriverDeliveriesFixer.syncAllDriverAssignments()">
+                                <i class="fas fa-calculator"></i> Recalcular Contadores
+                            </button>
+                        </div>
+                        <div class="alert alert-info mt-10" style="font-size: 13px;">
+                            <strong>👤 Para resolver problemas de repartidores sin entregas:</strong><br>
+                            1. Usa <strong>"Diagnóstico de Entregas"</strong> para verificar qué entregas deberían verse<br>
+                            2. Usa <strong>"Sincronizar Asignaciones"</strong> para actualizar rutas con sus entregas<br>
+                            3. Usa <strong>"Recalcular Contadores"</strong> para actualizar números en todas las rutas
                         </div>
                     </div>
                     
@@ -393,6 +417,10 @@
                         <button class="btn btn-sm btn-info" onclick="loadDataFromSupabase()" title="Recargar datos">
                             <i class="fas fa-sync-alt"></i>
                         </button>
+                        <!-- NUEVO BOTÓN AÑADIDO -->
+                        <button class="btn btn-sm btn-warning" onclick="showDriverDiagnosis()" title="Diagnóstico de entregas">
+                            <i class="fas fa-stethoscope"></i> Diagnóstico
+                        </button>
                     </div>
                 </div>
                 
@@ -411,6 +439,13 @@
                     <div class="header-actions">
                         <button class="btn btn-sm btn-info" onclick="loadDataFromSupabase()" title="Recargar datos">
                             <i class="fas fa-sync-alt"></i> Recargar
+                        </button>
+                        <!-- NUEVO BOTÓN AÑADIDO -->
+                        <button class="btn btn-sm btn-warning" onclick="showDriverDiagnosis()" title="Diagnóstico de entregas">
+                            <i class="fas fa-stethoscope"></i> Diagnóstico
+                        </button>
+                        <button class="btn btn-sm btn-primary" onclick="fixDriverView()" title="Reparar vista">
+                            <i class="fas fa-tools"></i> Reparar
                         </button>
                     </div>
                 </div>
@@ -670,7 +705,7 @@
                 <select id="comandaStatus" class="form-control" onchange="updateDeliveryStatusFromModal()">
                     <option value="pending">Pendiente</option>
                     <option value="in_progress">En camino</option>
-                    <option value="completed">Completada</option>
+                            <option value="completed">Completada</option>
                 </select>
             </div>
             
@@ -687,13 +722,13 @@
     <script src="js/auth-supabase.js"></script>
     <script src="js/dataManager-supabase.js"></script>
     <script src="js/sync-manager.js"></script>
-    <script src="js/route-fixer.js"></script>
     <script src="js/uiManager.js"></script>
     <script src="js/routes-supabase.js"></script>
     <script src="js/deliveries-supabase.js"></script>
     <script src="js/drivers-supabase.js"></script>
     <script src="js/manualGuide.js"></script>
-    <script src="js/init-supabase.js"></script>
+    <script src="js/route-fixer.js"></script>
+    <script src="js/driver-deliveries-fixer.js"></script>
     <script src="js/app-supabase.js"></script>
 </body>
 </html>

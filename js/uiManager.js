@@ -303,15 +303,49 @@ const UIManager = {
         }
     },
     
-    // Obtener entregas de un repartidor
+    // Obtener entregas de un repartidor (CORREGIDA)
     async getDriverDeliveries(driverName) {
         try {
-            const routes = await DataManagerSupabase.getRoutesFromSupabase();
-            const driverRoutes = routes.filter(route => route.driver === driverName);
-            const routeNames = driverRoutes.map(route => route.name);
+            console.log(`🔍 Buscando entregas para repartidor: ${driverName}`);
             
+            const routes = await DataManagerSupabase.getRoutesFromSupabase();
             const deliveries = await DataManagerSupabase.getDeliveriesFromSupabase();
-            return deliveries.filter(delivery => routeNames.includes(delivery.route));
+            
+            console.log(`📊 Datos disponibles: ${routes.length} rutas, ${deliveries.length} entregas`);
+            
+            // Función auxiliar para normalizar nombres
+            const normalize = (str) => {
+                if (!str) return '';
+                return str.toString().trim().toLowerCase();
+            };
+            
+            // 1. Encontrar rutas asignadas a este repartidor (comparación insensible a mayúsculas)
+            const driverRoutes = routes.filter(route => 
+                route.driver && normalize(route.driver) === normalize(driverName)
+            );
+            
+            console.log(`🛣️ Rutas encontradas para ${driverName}:`, driverRoutes.map(r => r.name));
+            
+            if (driverRoutes.length === 0) {
+                console.warn(`⚠️ No se encontraron rutas para el repartidor ${driverName}`);
+                return [];
+            }
+            
+            // 2. Encontrar entregas para estas rutas
+            const driverRouteNames = driverRoutes.map(route => route.name);
+            const driverDeliveries = deliveries.filter(delivery => {
+                if (!delivery.route) return false;
+                
+                // Verificar si la entrega está en alguna de las rutas del repartidor
+                return driverRouteNames.some(routeName => 
+                    normalize(routeName) === normalize(delivery.route)
+                );
+            });
+            
+            console.log(`📦 Entregas encontradas para ${driverName}: ${driverDeliveries.length}`);
+            
+            return driverDeliveries;
+            
         } catch (error) {
             console.error('Error obteniendo entregas del repartidor:', error);
             return [];
@@ -327,7 +361,11 @@ const UIManager = {
         
         try {
             const routes = await DataManagerSupabase.getRoutesFromSupabase();
-            const driverRoutes = routes.filter(route => route.driver === driverName);
+            const driverRoutes = routes.filter(route => {
+                // Comparación insensible a mayúsculas/minúsculas
+                const normalize = (str) => str ? str.toString().trim().toLowerCase() : '';
+                return route.driver && normalize(route.driver) === normalize(driverName);
+            });
             
             driverRoutesGrid.innerHTML = '';
             
@@ -496,6 +534,11 @@ const UIManager = {
                         <i class="fas fa-check-circle fa-3x mb-20" style="color: var(--light-gray);"></i>
                         <h3>No tienes entregas asignadas</h3>
                         <p>Espera a que el administrador te asigne rutas con entregas</p>
+                        <div class="mt-20">
+                            <button class="btn btn-warning" onclick="showDriverDiagnosis()">
+                                <i class="fas fa-stethoscope"></i> Diagnosticar Problema
+                            </button>
+                        </div>
                     </div>
                 `;
             }
