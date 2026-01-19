@@ -289,6 +289,27 @@
                             </button>
                         </div>
                     </div>
+
+                    <div class="mt-30">
+                        <h3>Herramientas de Sincronización</h3>
+                        <div class="flex gap-10" style="flex-wrap: wrap; margin-top: 15px;">
+                            <button class="btn btn-primary" onclick="forceResync()">
+                                <i class="fas fa-sync-alt"></i> Forzar Sincronización
+                            </button>
+                            <button class="btn btn-warning" onclick="repairData()">
+                                <i class="fas fa-tools"></i> Reparar Datos
+                            </button>
+                            <button class="btn btn-danger" onclick="clearAndResync()">
+                                <i class="fas fa-broom"></i> Limpiar y Re-sincronizar
+                            </button>
+                        </div>
+                        <div class="alert alert-info mt-10" style="font-size: 13px;">
+                            <strong>📊 Funciones de sincronización:</strong><br>
+                            • <strong>Forzar Sincronización:</strong> Actualiza datos entre Supabase y localStorage<br>
+                            • <strong>Reparar Datos:</strong> Corrige entregas/rutas huérfanas y problemas de consistencia<br>
+                            • <strong>Limpiar y Re-sincronizar:</strong> Borra todo local y vuelve a cargar desde Supabase
+                        </div>
+                    </div>
                     
                     <div class="mt-30">
                         <h3>Información del Sistema</h3>

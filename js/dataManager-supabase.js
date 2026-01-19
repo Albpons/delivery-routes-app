@@ -1,4 +1,4 @@
-// dataManager-supabase.js - Gestión de datos con Supabase
+// dataManager-supabase.js - Gestión de datos con Supabase - ACTUALIZADO CON CORRECCIONES
 const DataManagerSupabase = {
     // Inicializar datos
     async loadInitialData() {
@@ -20,10 +20,15 @@ const DataManagerSupabase = {
                 this.getDriversFromSupabase()
             ]);
             
-            console.log(`✅ Datos cargados: ${routes.length} rutas, ${deliveries.length} entregas, ${drivers.length} repartidores`);
+            console.log(`✅ Datos cargados desde Supabase: ${routes.length} rutas, ${deliveries.length} entregas, ${drivers.length} repartidores`);
             
             // Sincronizar datos locales si hay diferencia
             await this.syncIfNeeded(routes, deliveries, drivers);
+            
+            // Actualizar localStorage con datos de Supabase
+            localStorage.setItem('delivery_routes', JSON.stringify(routes));
+            localStorage.setItem('delivery_deliveries', JSON.stringify(deliveries));
+            localStorage.setItem('delivery_drivers', JSON.stringify(drivers));
             
             return { routes, deliveries, drivers };
             
@@ -35,56 +40,89 @@ const DataManagerSupabase = {
 
     // Obtener rutas desde Supabase
     async getRoutesFromSupabase() {
-        const result = await SupabaseManager.withCacheFallback(
-            async () => {
-                const { data, error } = await supabase
-                    .from('routes')
-                    .select('*')
-                    .order('created_at', { ascending: false });
-                
-                if (error) throw error;
-                return { data };
-            },
-            'routes_cache'
-        );
-        
-        return result.data || [];
+        try {
+            if (!window.supabase) {
+                throw new Error('Supabase no disponible');
+            }
+            
+            const { data, error } = await window.supabase
+                .from('routes')
+                .select('*')
+                .order('created_at', { ascending: false });
+            
+            if (error) {
+                console.error('Error obteniendo rutas:', error);
+                throw error;
+            }
+            
+            // Guardar en caché local
+            localStorage.setItem('routes_cache', JSON.stringify(data || []));
+            
+            return data || [];
+            
+        } catch (error) {
+            console.warn('⚠️ Error obteniendo rutas de Supabase, usando caché local');
+            const cached = localStorage.getItem('routes_cache');
+            return cached ? JSON.parse(cached) : [];
+        }
     },
 
     // Obtener entregas desde Supabase
     async getDeliveriesFromSupabase() {
-        const result = await SupabaseManager.withCacheFallback(
-            async () => {
-                const { data, error } = await supabase
-                    .from('deliveries')
-                    .select('*')
-                    .order('created_at', { ascending: false });
-                
-                if (error) throw error;
-                return { data };
-            },
-            'deliveries_cache'
-        );
-        
-        return result.data || [];
+        try {
+            if (!window.supabase) {
+                throw new Error('Supabase no disponible');
+            }
+            
+            const { data, error } = await window.supabase
+                .from('deliveries')
+                .select('*')
+                .order('created_at', { ascending: false });
+            
+            if (error) {
+                console.error('Error obteniendo entregas:', error);
+                throw error;
+            }
+            
+            // Guardar en caché local
+            localStorage.setItem('deliveries_cache', JSON.stringify(data || []));
+            
+            return data || [];
+            
+        } catch (error) {
+            console.warn('⚠️ Error obteniendo entregas de Supabase, usando caché local');
+            const cached = localStorage.getItem('deliveries_cache');
+            return cached ? JSON.parse(cached) : [];
+        }
     },
 
     // Obtener repartidores desde Supabase
     async getDriversFromSupabase() {
-        const result = await SupabaseManager.withCacheFallback(
-            async () => {
-                const { data, error } = await supabase
-                    .from('drivers')
-                    .select('*')
-                    .order('name');
-                
-                if (error) throw error;
-                return { data };
-            },
-            'drivers_cache'
-        );
-        
-        return result.data || [];
+        try {
+            if (!window.supabase) {
+                throw new Error('Supabase no disponible');
+            }
+            
+            const { data, error } = await window.supabase
+                .from('drivers')
+                .select('*')
+                .order('name');
+            
+            if (error) {
+                console.error('Error obteniendo repartidores:', error);
+                throw error;
+            }
+            
+            // Guardar en caché local
+            localStorage.setItem('drivers_cache', JSON.stringify(data || []));
+            
+            return data || [];
+            
+        } catch (error) {
+            console.warn('⚠️ Error obteniendo repartidores de Supabase, usando caché local');
+            const cached = localStorage.getItem('drivers_cache');
+            return cached ? JSON.parse(cached) : [];
+        }
     },
 
     // Cargar desde localStorage (fallback)
@@ -94,6 +132,8 @@ const DataManagerSupabase = {
         const routes = JSON.parse(localStorage.getItem('delivery_routes') || '[]');
         const deliveries = JSON.parse(localStorage.getItem('delivery_deliveries') || '[]');
         const drivers = JSON.parse(localStorage.getItem('delivery_drivers') || '[]');
+        
+        console.log(`📊 Datos locales: ${routes.length} rutas, ${deliveries.length} entregas, ${drivers.length} repartidores`);
         
         return { routes, deliveries, drivers };
     },
@@ -105,42 +145,93 @@ const DataManagerSupabase = {
         const localDrivers = JSON.parse(localStorage.getItem('delivery_drivers') || '[]');
         
         // Si hay más datos locales que en Supabase, sincronizar
-        if (localRoutes.length > supabaseRoutes.length ||
-            localDeliveries.length > supabaseDeliveries.length ||
-            localDrivers.length > supabaseDrivers.length) {
-            
+        if (localRoutes.length > 0 || localDeliveries.length > 0 || localDrivers.length > 0) {
             console.log('🔄 Sincronizando datos locales con Supabase...');
-            await SupabaseManager.syncLocalToSupabase();
+            
+            // Sincronizar rutas locales a Supabase
+            for (const route of localRoutes) {
+                const existsInSupabase = supabaseRoutes.some(r => r.id === route.id);
+                if (!existsInSupabase && route.id) {
+                    try {
+                        await this.createRoute(route);
+                    } catch (e) {
+                        console.warn('No se pudo sincronizar ruta:', route.id, e.message);
+                    }
+                }
+            }
+            
+            // Sincronizar entregas locales a Supabase
+            for (const delivery of localDeliveries) {
+                const existsInSupabase = supabaseDeliveries.some(d => d.id === delivery.id);
+                if (!existsInSupabase && delivery.id) {
+                    try {
+                        // Asegurarnos de usar el campo correcto para la comanda
+                        const deliveryToSync = {
+                            ...delivery,
+                            order_details: delivery.order_details || delivery.order || ''
+                        };
+                        await this.createDelivery(deliveryToSync);
+                    } catch (e) {
+                        console.warn('No se pudo sincronizar entrega:', delivery.id, e.message);
+                    }
+                }
+            }
+            
+            // Sincronizar repartidores locales a Supabase
+            for (const driver of localDrivers) {
+                const existsInSupabase = supabaseDrivers.some(d => d.id === driver.id);
+                if (!existsInSupabase && driver.id) {
+                    try {
+                        await this.createDriver(driver);
+                    } catch (e) {
+                        console.warn('No se pudo sincronizar repartidor:', driver.id, e.message);
+                    }
+                }
+            }
         }
     },
 
     // CRUD para rutas
     async createRoute(route) {
         try {
-            const { data, error } = await supabase
-                .from('routes')
-                .insert([{
-                    name: route.name,
-                    driver: route.driver,
-                    status: route.status,
-                    deliveries: route.deliveries || 0,
-                    completed: route.completed || 0,
-                    description: route.description,
-                    created_at: new Date().toISOString()
-                }])
-                .select();
+            // Preparar datos para Supabase
+            const routeData = {
+                name: route.name,
+                driver: route.driver || null,
+                status: route.status || 'pending',
+                deliveries: route.deliveries || 0,
+                completed: route.completed || 0,
+                description: route.description || '',
+                created_at: route.created_at || new Date().toISOString()
+            };
             
-            if (error) throw error;
+            let result;
+            
+            if (window.supabase) {
+                const { data, error } = await window.supabase
+                    .from('routes')
+                    .insert([routeData])
+                    .select();
+                
+                if (error) throw error;
+                
+                result = { success: true, data: data[0] };
+            } else {
+                // Modo offline: crear ID temporal
+                route.id = route.id || Date.now();
+                route.created_at = new Date().toISOString();
+                result = { success: true, data: route };
+            }
             
             // Actualizar caché local
-            this.updateLocalCache('routes', data[0], 'add');
+            this.updateLocalCache('routes', result.data, 'add');
             
-            return { success: true, data: data[0] };
+            return result;
             
         } catch (error) {
             console.error('Error creando ruta:', error);
             // Guardar localmente para sincronizar después
-            route.id = Date.now();
+            route.id = route.id || Date.now();
             route.created_at = new Date().toISOString();
             this.updateLocalCache('routes', route, 'add');
             
@@ -150,26 +241,36 @@ const DataManagerSupabase = {
 
     async updateRoute(route) {
         try {
-            const { data, error } = await supabase
-                .from('routes')
-                .update({
-                    name: route.name,
-                    driver: route.driver,
-                    status: route.status,
-                    deliveries: route.deliveries,
-                    completed: route.completed,
-                    description: route.description,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', route.id)
-                .select();
+            const routeData = {
+                name: route.name,
+                driver: route.driver,
+                status: route.status,
+                deliveries: route.deliveries,
+                completed: route.completed,
+                description: route.description,
+                updated_at: new Date().toISOString()
+            };
             
-            if (error) throw error;
+            let result;
+            
+            if (window.supabase && route.id) {
+                const { data, error } = await window.supabase
+                    .from('routes')
+                    .update(routeData)
+                    .eq('id', route.id)
+                    .select();
+                
+                if (error) throw error;
+                
+                result = { success: true, data: data[0] };
+            } else {
+                result = { success: true, data: route };
+            }
             
             // Actualizar caché local
-            this.updateLocalCache('routes', data[0], 'update');
+            this.updateLocalCache('routes', result.data, 'update');
             
-            return { success: true, data: data[0] };
+            return result;
             
         } catch (error) {
             console.error('Error actualizando ruta:', error);
@@ -182,12 +283,14 @@ const DataManagerSupabase = {
 
     async deleteRoute(routeId) {
         try {
-            const { error } = await supabase
-                .from('routes')
-                .delete()
-                .eq('id', routeId);
-            
-            if (error) throw error;
+            if (window.supabase) {
+                const { error } = await window.supabase
+                    .from('routes')
+                    .delete()
+                    .eq('id', routeId);
+                
+                if (error) throw error;
+            }
             
             // Actualizar caché local
             this.updateLocalCache('routes', { id: routeId }, 'delete');
@@ -203,31 +306,45 @@ const DataManagerSupabase = {
         }
     },
 
-    // CRUD para entregas (similar a rutas)
+    // CRUD para entregas
     async createDelivery(delivery) {
         try {
-            const { data, error } = await supabase
-                .from('deliveries')
-                .insert([{
-                    client: delivery.client,
-                    address: delivery.address,
-                    phone: delivery.phone,
-                    route: delivery.route,
-                    order_details: delivery.order_details || delivery.order,  // <-- CAMBIADO A 'order_details'
-                    observations: delivery.observations,
-                    status: delivery.status || 'pending',
-                    created_at: new Date().toISOString()
-                }])
-                .select();
+            // Preparar datos para Supabase
+            const deliveryData = {
+                client: delivery.client,
+                address: delivery.address,
+                phone: delivery.phone || '',
+                route: delivery.route || null,
+                order_details: delivery.order_details || delivery.order || '', // CORREGIDO
+                observations: delivery.observations || '',
+                status: delivery.status || 'pending',
+                created_at: delivery.created_at || new Date().toISOString()
+            };
             
-            if (error) throw error;
+            let result;
             
-            this.updateLocalCache('deliveries', data[0], 'add');
-            return { success: true, data: data[0] };
+            if (window.supabase) {
+                const { data, error } = await window.supabase
+                    .from('deliveries')
+                    .insert([deliveryData])
+                    .select();
+                
+                if (error) throw error;
+                
+                result = { success: true, data: data[0] };
+            } else {
+                // Modo offline
+                delivery.id = delivery.id || Date.now();
+                delivery.created_at = new Date().toISOString();
+                result = { success: true, data: delivery };
+            }
+            
+            this.updateLocalCache('deliveries', result.data, 'add');
+            return result;
             
         } catch (error) {
             console.error('Error creando entrega:', error);
-            delivery.id = Date.now();
+            delivery.id = delivery.id || Date.now();
             delivery.created_at = new Date().toISOString();
             this.updateLocalCache('deliveries', delivery, 'add');
             
@@ -237,25 +354,35 @@ const DataManagerSupabase = {
 
     async updateDelivery(delivery) {
         try {
-            const { data, error } = await supabase
-                .from('deliveries')
-                .update({
-                    client: delivery.client,
-                    address: delivery.address,
-                    phone: delivery.phone,
-                    route: delivery.route,
-                    order_details: delivery.order_details || delivery.order,  // <-- CAMBIADO AQUÍ TAMBIÉN
-                    observations: delivery.observations,
-                    status: delivery.status,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', delivery.id)
-                .select();
+            const deliveryData = {
+                client: delivery.client,
+                address: delivery.address,
+                phone: delivery.phone,
+                route: delivery.route,
+                order_details: delivery.order_details || delivery.order || '', // CORREGIDO
+                observations: delivery.observations,
+                status: delivery.status,
+                updated_at: new Date().toISOString()
+            };
             
-            if (error) throw error;
+            let result;
             
-            this.updateLocalCache('deliveries', data[0], 'update');
-            return { success: true, data: data[0] };
+            if (window.supabase && delivery.id) {
+                const { data, error } = await window.supabase
+                    .from('deliveries')
+                    .update(deliveryData)
+                    .eq('id', delivery.id)
+                    .select();
+                
+                if (error) throw error;
+                
+                result = { success: true, data: data[0] };
+            } else {
+                result = { success: true, data: delivery };
+            }
+            
+            this.updateLocalCache('deliveries', result.data, 'update');
+            return result;
             
         } catch (error) {
             console.error('Error actualizando entrega:', error);
@@ -267,12 +394,14 @@ const DataManagerSupabase = {
 
     async deleteDelivery(deliveryId) {
         try {
-            const { error } = await supabase
-                .from('deliveries')
-                .delete()
-                .eq('id', deliveryId);
-            
-            if (error) throw error;
+            if (window.supabase) {
+                const { error } = await window.supabase
+                    .from('deliveries')
+                    .delete()
+                    .eq('id', deliveryId);
+                
+                if (error) throw error;
+            }
             
             this.updateLocalCache('deliveries', { id: deliveryId }, 'delete');
             return { success: true };
@@ -285,34 +414,109 @@ const DataManagerSupabase = {
         }
     },
 
-    // CRUD para repartidores (similar)
+    // CRUD para repartidores
     async createDriver(driver) {
         try {
-            const { data, error } = await supabase
-                .from('drivers')
-                .insert([{
-                    name: driver.name,
-                    username: driver.username,
-                    email: driver.email,
-                    phone: driver.phone,
-                    vehicle: driver.vehicle,
-                    license: driver.license,
-                    deliveries: driver.deliveries || 0,
-                    status: driver.status || 'active',
-                    created_at: new Date().toISOString()
-                }])
-                .select();
+            const driverData = {
+                name: driver.name,
+                username: driver.username,
+                email: driver.email,
+                phone: driver.phone || '',
+                vehicle: driver.vehicle || 'Motocicleta',
+                license: driver.license || '',
+                deliveries: driver.deliveries || 0,
+                status: driver.status || 'active',
+                created_at: driver.created_at || new Date().toISOString()
+            };
             
-            if (error) throw error;
+            let result;
             
-            this.updateLocalCache('drivers', data[0], 'add');
-            return { success: true, data: data[0] };
+            if (window.supabase) {
+                const { data, error } = await window.supabase
+                    .from('drivers')
+                    .insert([driverData])
+                    .select();
+                
+                if (error) throw error;
+                
+                result = { success: true, data: data[0] };
+            } else {
+                driver.id = driver.id || Date.now();
+                driver.created_at = new Date().toISOString();
+                result = { success: true, data: driver };
+            }
+            
+            this.updateLocalCache('drivers', result.data, 'add');
+            return result;
             
         } catch (error) {
             console.error('Error creando repartidor:', error);
-            driver.id = Date.now();
+            driver.id = driver.id || Date.now();
             driver.created_at = new Date().toISOString();
             this.updateLocalCache('drivers', driver, 'add');
+            
+            return { success: false, error: error.message };
+        }
+    },
+
+    async updateDriver(driver) {
+        try {
+            const driverData = {
+                name: driver.name,
+                username: driver.username,
+                email: driver.email,
+                phone: driver.phone,
+                vehicle: driver.vehicle,
+                license: driver.license,
+                deliveries: driver.deliveries,
+                status: driver.status,
+                updated_at: new Date().toISOString()
+            };
+            
+            let result;
+            
+            if (window.supabase && driver.id) {
+                const { data, error } = await window.supabase
+                    .from('drivers')
+                    .update(driverData)
+                    .eq('id', driver.id)
+                    .select();
+                
+                if (error) throw error;
+                
+                result = { success: true, data: data[0] };
+            } else {
+                result = { success: true, data: driver };
+            }
+            
+            this.updateLocalCache('drivers', result.data, 'update');
+            return result;
+            
+        } catch (error) {
+            console.error('Error actualizando repartidor:', error);
+            this.updateLocalCache('drivers', driver, 'update');
+            
+            return { success: false, error: error.message };
+        }
+    },
+
+    async deleteDriver(driverId) {
+        try {
+            if (window.supabase) {
+                const { error } = await window.supabase
+                    .from('drivers')
+                    .delete()
+                    .eq('id', driverId);
+                
+                if (error) throw error;
+            }
+            
+            this.updateLocalCache('drivers', { id: driverId }, 'delete');
+            return { success: true };
+            
+        } catch (error) {
+            console.error('Error eliminando repartidor:', error);
+            this.updateLocalCache('drivers', { id: driverId }, 'delete');
             
             return { success: false, error: error.message };
         }
@@ -328,7 +532,13 @@ const DataManagerSupabase = {
         
         switch(action) {
             case 'add':
-                items.push(item);
+                // Verificar si ya existe
+                const existingIndex = items.findIndex(i => i.id === item.id);
+                if (existingIndex === -1) {
+                    items.push(item);
+                } else {
+                    items[existingIndex] = { ...items[existingIndex], ...item };
+                }
                 break;
             case 'update':
                 const index = items.findIndex(i => i.id === item.id);
@@ -360,25 +570,6 @@ const DataManagerSupabase = {
             completedDeliveries: deliveries.filter(d => d.status === 'completed').length,
             totalDrivers: drivers.filter(d => d.status === 'active').length
         };
-    },
-
-    // Suscribirse a cambios en tiempo real
-    subscribeToRealtimeChanges() {
-        // Rutas
-        SupabaseManager.subscribeToChanges('routes', 'INSERT', (payload) => {
-            console.log('Nueva ruta:', payload.new);
-            UIManager.showNotification('🆕 Nueva ruta añadida', 'info');
-            RouteManagerSupabase.loadRoutes();
-        });
-        
-        // Entregas
-        SupabaseManager.subscribeToChanges('deliveries', 'UPDATE', (payload) => {
-            console.log('Entrega actualizada:', payload.new);
-            if (payload.new.status === 'completed') {
-                UIManager.showNotification('✅ Entrega completada', 'success');
-            }
-            DeliveryManagerSupabase.loadDeliveries();
-        });
     }
 };
 
