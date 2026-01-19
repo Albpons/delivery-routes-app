@@ -1,8 +1,8 @@
-// app.js - Archivo principal
+// app.js - Archivo principal simplificado
 document.addEventListener('DOMContentLoaded', async function() {
     console.log('🚀 Delivery Pro App iniciando...');
     
-    // Inicializar configuración
+    // Inicializar aplicación
     await initializeApp();
 });
 
@@ -13,35 +13,48 @@ async function initializeApp() {
         updateConnectionStatus('Conectando...', 'info');
         
         // Inicializar base de datos
-        const initResult = await initializeDatabase();
+        const initResult = await window.initializeDatabase();
         
-        if (initResult.success) {
-            showToast(initResult.message, 'success');
+        if (initResult && initResult.success) {
+            console.log('✅ Aplicación inicializada correctamente');
+            
+            if (initResult.offline) {
+                updateConnectionStatus('⚠️ Modo offline activado', 'warning');
+                showToast('Modo offline - usando datos locales', 'warning');
+            } else {
+                updateConnectionStatus('✅ Conectado a Supabase', 'success');
+            }
             
             // Cargar repartidores para login
             if (window.AuthManager) {
                 await AuthManager.loadDriversForLogin();
             }
             
+            // Verificar autenticación automática
+            if (window.AuthManager) {
+                const autoLogin = await AuthManager.init();
+                if (autoLogin) {
+                    console.log('✅ Sesión recuperada automáticamente');
+                }
+            }
+            
             // Configurar eventos
             setupEventListeners();
             
-            // Verificar autenticación automática
-            const autoLogin = await AuthManager.init();
-            if (autoLogin) {
-                console.log('✅ Sesión recuperada automáticamente');
-            }
-            
-            // Actualizar estado de conexión
-            updateConnectionStatus('✅ Conectado a Supabase', 'success');
         } else {
-            console.error('❌ Error inicializando:', initResult.error);
+            console.error('❌ Error inicializando:', initResult?.error);
             updateConnectionStatus('⚠️ Error de conexión', 'error');
-            showToast('Modo offline activado', 'warning');
+            showToast('Error de conexión - modo offline activado', 'error');
+            
+            // Intentar cargar datos locales
+            if (window.DataManager) {
+                await DataManager.loadInitialData();
+            }
         }
     } catch (error) {
         console.error('❌ Error inicializando aplicación:', error);
         updateConnectionStatus('⚠️ Error crítico', 'error');
+        showToast('Error inicializando aplicación', 'error');
     }
 }
 
@@ -65,52 +78,7 @@ function setupEventListeners() {
         });
     }
     
-    // Drag and drop para CSV
-    setupCSVDragAndDrop();
-    
-    // Cerrar modales al hacer clic fuera
-    setupModalCloseListeners();
-}
-
-// Configurar drag and drop para CSV
-function setupCSVDragAndDrop() {
-    const dropZone = document.getElementById('csvDropZone');
-    if (!dropZone) return;
-    
-    dropZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropZone.style.borderColor = 'var(--primary)';
-        dropZone.style.background = 'var(--primary-light)';
-    });
-    
-    dropZone.addEventListener('dragleave', () => {
-        dropZone.style.borderColor = '';
-        dropZone.style.background = '';
-    });
-    
-    dropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropZone.style.borderColor = '';
-        dropZone.style.background = '';
-        
-        const files = e.dataTransfer.files;
-        if (files.length > 0 && files[0].name.toLowerCase().endsWith('.csv')) {
-            document.getElementById('csvFileInput').files = files;
-            CSVManager.handleFile(files[0]);
-        }
-    });
-}
-
-// Configurar cierre de modales
-function setupModalCloseListeners() {
-    const modals = document.querySelectorAll('.modal');
-    modals.forEach(modal => {
-        modal.addEventListener('click', function(e) {
-            if (e.target === this) {
-                this.classList.remove('active');
-            }
-        });
-    });
+    console.log('✅ Event listeners configurados');
 }
 
 // Actualizar estado de conexión
@@ -118,88 +86,53 @@ function updateConnectionStatus(message, type) {
     const statusElement = document.getElementById('connectionStatus');
     if (!statusElement) return;
     
-    statusElement.textContent = message;
+    const icons = {
+        success: 'fa-wifi',
+        error: 'fa-wifi-slash',
+        info: 'fa-sync fa-spin',
+        warning: 'fa-exclamation-triangle'
+    };
+    
+    const classes = {
+        success: 'connected',
+        error: 'disconnected',
+        info: '',
+        warning: 'disconnected'
+    };
+    
+    statusElement.innerHTML = `<i class="fas ${icons[type] || 'fa-wifi'}"></i> ${message}`;
     statusElement.className = 'connection-status';
     
-    switch(type) {
-        case 'success':
-            statusElement.classList.add('connected');
-            statusElement.innerHTML = `<i class="fas fa-wifi"></i> ${message}`;
-            break;
-        case 'error':
-            statusElement.classList.add('disconnected');
-            statusElement.innerHTML = `<i class="fas fa-wifi-slash"></i> ${message}`;
-            break;
-        case 'info':
-            statusElement.innerHTML = `<i class="fas fa-sync fa-spin"></i> ${message}`;
-            break;
-        case 'warning':
-            statusElement.classList.add('disconnected');
-            statusElement.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
-            break;
+    if (classes[type]) {
+        statusElement.classList.add(classes[type]);
     }
 }
 
-// Función para mostrar secciones (admin)
-window.showSection = function(sectionId) {
-    if (window.UIManager) {
-        UIManager.showSection(sectionId);
-    }
-};
-
-// Función para mostrar secciones (repartidor)
-window.showDriverSection = function(sectionId) {
-    if (window.UIManager) {
-        UIManager.showDriverSection(sectionId);
-    }
-};
-
-// Función para alternar sidebar
-window.toggleSidebar = function() {
-    if (window.UIManager) {
-        UIManager.toggleSidebar();
-    }
-};
-
-// Función para refrescar datos
-window.refreshData = async function() {
-    showToast('Actualizando datos...', 'info');
-    
-    try {
-        await DataManager.loadInitialData();
-        showToast('Datos actualizados correctamente', 'success');
-    } catch (error) {
-        showToast('Error actualizando datos', 'error');
-    }
-};
-
 // Inicializar módulos cuando estén disponibles
 document.addEventListener('DOMContentLoaded', function() {
-    // Inicializar CSV Manager
-    if (window.CSVManager) {
-        CSVManager.init();
-    }
+    // Inicializar módulos con verificación
+    const initModules = () => {
+        if (window.CSVManager && window.CSVManager.init) {
+            CSVManager.init();
+        }
+        if (window.UIManager && window.UIManager.init) {
+            UIManager.init();
+        }
+        if (window.RouteManager && window.RouteManager.init) {
+            RouteManager.init();
+        }
+        if (window.DeliveryManager && window.DeliveryManager.init) {
+            DeliveryManager.init();
+        }
+        if (window.DriverManager && window.DriverManager.init) {
+            DriverManager.init();
+        }
+    };
     
-    // Inicializar UI Manager
-    if (window.UIManager) {
-        UIManager.init();
-    }
-    
-    // Inicializar Route Manager
-    if (window.RouteManager) {
-        RouteManager.init();
-    }
-    
-    // Inicializar Delivery Manager
-    if (window.DeliveryManager) {
-        DeliveryManager.init();
-    }
-    
-    // Inicializar Driver Manager
-    if (window.DriverManager) {
-        DriverManager.init();
-    }
+    // Esperar un momento para que los scripts carguen
+    setTimeout(initModules, 100);
 });
 
 // Exportar funciones globales
 window.initializeApp = initializeApp;
+window.updateConnectionStatus = updateConnectionStatus;

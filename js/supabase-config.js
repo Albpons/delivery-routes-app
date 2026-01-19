@@ -1,9 +1,13 @@
-// Configuración de Supabase
-const SUPABASE_URL = 'https://gryjdkuexbepehmtcrum.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdyeWpka3VleGJlcGVobXRjcnVtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3MDY3NzgsImV4cCI6MjA4NDI4Mjc3OH0.gZMljLMfIcrfcddM9kAHdo8XB0SWjA8BBow3TowF_UY';
+// supabase-config.js - Configuración de Supabase (CORREGIDO)
 
-// Inicializar Supabase
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Si Supabase ya está definido, no lo redeclares
+if (!window.supabase) {
+    const SUPABASE_URL = 'https://gryjdkuexbepehmtcrum.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdyeWpka3VleGJlcGVobXRjcnVtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3MDY3NzgsImV4cCI6MjA4NDI4Mjc3OH0.gZMljLMfIcrfcddM9kAHdo8XB0SWjA8BBow3TowF_UY';
+    
+    // Inicializar Supabase solo si no existe
+    window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
 
 // Configuración de la aplicación
 const AppConfig = {
@@ -57,7 +61,7 @@ const AppConfig = {
     DEFAULT_CREDENTIALS: {
         ADMIN_EMAIL: 'admin@delivery.com',
         ADMIN_PASSWORD: 'admin123',
-        DRIVER_PASSWORD: '123'  // Contraseña para todos los repartidores
+        DRIVER_PASSWORD: '123'
     }
 };
 
@@ -66,7 +70,12 @@ async function checkSupabaseConnection() {
     try {
         console.log('🔌 Verificando conexión a Supabase...');
         
-        const { data, error } = await supabase
+        // Usar el cliente global
+        if (!window.supabase) {
+            throw new Error('Supabase no está inicializado');
+        }
+        
+        const { data, error } = await window.supabase
             .from(AppConfig.TABLES.DRIVERS)
             .select('count')
             .limit(1);
@@ -94,20 +103,20 @@ async function checkSupabaseConnection() {
     }
 }
 
-// Insertar datos iniciales si las tablas están vacías
+// Insertar datos iniciales
 async function initializeSampleData() {
     try {
         console.log('📝 Verificando datos iniciales...');
         
         // Verificar si hay repartidores
-        const { data: drivers, error: driversError } = await supabase
+        const { data: drivers, error: driversError } = await window.supabase
             .from(AppConfig.TABLES.DRIVERS)
             .select('count');
         
         if (driversError) throw driversError;
         
         // Si no hay repartidores, insertar datos de ejemplo
-        if (drivers[0].count === 0) {
+        if (!drivers || drivers.length === 0 || drivers[0].count === 0) {
             console.log('📦 Insertando datos iniciales...');
             
             // Insertar repartidores de ejemplo
@@ -129,37 +138,10 @@ async function initializeSampleData() {
                     vehicle: 'Coche',
                     license: 'B-234567',
                     status: 'active'
-                },
-                {
-                    name: 'Nuria García',
-                    username: 'nuria',
-                    email: 'nuria@empresa.com',
-                    phone: '634567890',
-                    vehicle: 'Furgoneta',
-                    license: 'C-345678',
-                    status: 'active'
-                },
-                {
-                    name: 'Santi Pérez',
-                    username: 'santi',
-                    email: 'santi@empresa.com',
-                    phone: '645678901',
-                    vehicle: 'Bicicleta',
-                    license: 'D-456789',
-                    status: 'active'
-                },
-                {
-                    name: 'Albert Ruiz',
-                    username: 'albert',
-                    email: 'albert@empresa.com',
-                    phone: '656789012',
-                    vehicle: 'Motocicleta',
-                    license: 'E-567890',
-                    status: 'active'
                 }
             ];
             
-            const { error: insertDriversError } = await supabase
+            const { error: insertDriversError } = await window.supabase
                 .from(AppConfig.TABLES.DRIVERS)
                 .insert(sampleDrivers);
             
@@ -167,19 +149,23 @@ async function initializeSampleData() {
             console.log('✅ Repartidores insertados');
             
             // Insertar usuario admin
-            const { error: insertUserError } = await supabase
-                .from(AppConfig.TABLES.USERS)
-                .insert([{
-                    email: AppConfig.DEFAULT_CREDENTIALS.ADMIN_EMAIL,
-                    password: AppConfig.DEFAULT_CREDENTIALS.ADMIN_PASSWORD,
-                    name: 'Administrador',
-                    role: 'admin'
-                }]);
-            
-            if (insertUserError) {
-                console.warn('⚠️ No se pudo insertar usuario admin:', insertUserError);
-            } else {
-                console.log('✅ Usuario admin insertado');
+            try {
+                const { error: insertUserError } = await window.supabase
+                    .from(AppConfig.TABLES.USERS)
+                    .insert([{
+                        email: AppConfig.DEFAULT_CREDENTIALS.ADMIN_EMAIL,
+                        password: AppConfig.DEFAULT_CREDENTIALS.ADMIN_PASSWORD,
+                        name: 'Administrador',
+                        role: 'admin'
+                    }]);
+                
+                if (insertUserError && !insertUserError.message.includes('duplicate')) {
+                    console.warn('⚠️ No se pudo insertar usuario admin:', insertUserError);
+                } else {
+                    console.log('✅ Usuario admin insertado');
+                }
+            } catch (userError) {
+                console.warn('⚠️ Error con tabla users:', userError.message);
             }
         } else {
             console.log('📊 Datos ya existen, omitiendo inserción inicial');
@@ -192,99 +178,72 @@ async function initializeSampleData() {
     }
 }
 
-// Crear políticas de seguridad (RLS) si no existen
-async function setupRLSPolicies() {
-    try {
-        console.log('🔐 Configurando políticas de seguridad...');
-        
-        // Nota: Esto requiere permisos de administrador en Supabase
-        // En producción, deberías configurar esto desde el dashboard de Supabase
-        
-        return { success: true };
-    } catch (error) {
-        console.warn('⚠️ No se pudieron configurar políticas RLS:', error);
-        return { success: false, error: error.message };
-    }
-}
-
-// Función para verificar y ajustar estructura de tablas
+// Verificar estructura de tablas
 async function verifyTableStructure() {
     try {
         console.log('🔍 Verificando estructura de tablas...');
         
-        // Verificar columnas en tabla deliveries
-        const { data: columns, error } = await supabase
-            .from('information_schema.columns')
-            .select('column_name, data_type')
-            .eq('table_name', 'deliveries')
-            .eq('table_schema', 'public');
+        // Intentar consultar cada tabla
+        const checks = [
+            window.supabase.from(AppConfig.TABLES.DRIVERS).select('count').limit(1),
+            window.supabase.from(AppConfig.TABLES.ROUTES).select('count').limit(1),
+            window.supabase.from(AppConfig.TABLES.DELIVERIES).select('count').limit(1)
+        ];
         
-        if (error) throw error;
+        const results = await Promise.allSettled(checks);
         
-        const columnNames = columns.map(col => col.column_name);
+        const errors = [];
+        results.forEach((result, index) => {
+            if (result.status === 'rejected') {
+                const tableNames = ['drivers', 'routes', 'deliveries'];
+                errors.push(`Tabla ${tableNames[index]}: ${result.reason.message}`);
+            }
+        });
         
-        // Verificar si existe la columna 'order' (en lugar de 'order_details')
-        if (columnNames.includes('order') && !columnNames.includes('order_details')) {
-            console.log('⚠️ Tabla deliveries usa columna "order" en lugar de "order_details"');
-            
-            // Para desarrollo, podemos usar 'order' en lugar de 'order_details'
-            AppConfig.COLUMN_MAPPING = {
-                order_details: 'order'
-            };
-        } else {
-            AppConfig.COLUMN_MAPPING = {
-                order_details: 'order_details'
-            };
+        if (errors.length > 0) {
+            console.warn('⚠️ Problemas con las tablas:', errors);
+            return { success: false, errors };
         }
         
-        console.log('✅ Estructura verificada');
-        return { success: true, columnMapping: AppConfig.COLUMN_MAPPING };
+        console.log('✅ Todas las tablas están accesibles');
+        return { success: true };
     } catch (error) {
         console.error('❌ Error verificando estructura:', error);
         return { success: false, error: error.message };
     }
 }
 
-// Inicializar base de datos completa
+// Inicializar base de datos
 async function initializeDatabase() {
     try {
+        console.log('🏗️ Inicializando base de datos...');
+        
         // Verificar conexión
         const connection = await checkSupabaseConnection();
         if (!connection.success) {
-            return connection;
+            console.warn('⚠️ No hay conexión a Supabase, modo offline activado');
+            return { success: true, offline: true };
         }
         
         // Verificar estructura
         const structure = await verifyTableStructure();
         if (!structure.success) {
-            return structure;
+            console.warn('⚠️ Problemas con la estructura, pero continuando...');
         }
         
         // Insertar datos iniciales
         await initializeSampleData();
         
-        // Configurar políticas (opcional)
-        await setupRLSPolicies();
-        
-        return { 
-            success: true, 
-            message: '✅ Base de datos inicializada correctamente',
-            columnMapping: structure.columnMapping
-        };
+        console.log('✅ Base de datos inicializada');
+        return { success: true };
     } catch (error) {
         console.error('❌ Error inicializando base de datos:', error);
-        return { success: false, error: error.message };
+        return { success: false, error: error.message, offline: true };
     }
 }
 
-// Función para obtener el nombre correcto de la columna de comanda
-function getOrderColumnName() {
-    return AppConfig.COLUMN_MAPPING?.order_details || 'order_details';
-}
-
 // Exportar para uso global
-window.supabase = supabase;
 window.AppConfig = AppConfig;
 window.checkSupabaseConnection = checkSupabaseConnection;
 window.initializeDatabase = initializeDatabase;
-window.getOrderColumnName = getOrderColumnName;
+window.verifyTableStructure = verifyTableStructure;

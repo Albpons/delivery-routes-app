@@ -17,7 +17,7 @@ const AuthManager = {
                 this.userRole = this.currentUser.role;
                 
                 // Verificar conexión a Supabase
-                const connection = await checkSupabaseConnection();
+                const connection = await window.checkSupabaseConnection();
                 
                 if (connection.online) {
                     // Verificar que el usuario aún existe
@@ -36,7 +36,7 @@ const AuthManager = {
                     } else {
                         // Verificar repartidor
                         const { data: driver, error } = await supabase
-                            .from(AppConfig.TABLES.DRIVERS)
+                            .from(window.AppConfig.TABLES.DRIVERS)
                             .select('*')
                             .eq('id', this.currentUser.id)
                             .single();
@@ -93,8 +93,8 @@ const AuthManager = {
     async loginAsDriver(driverId, password) {
         try {
             // Obtener repartidor de Supabase
-            const { data: drivers, error } = await supabase
-                .from(AppConfig.TABLES.DRIVERS)
+            const { data: drivers, error } = await window.supabase
+                .from(window.AppConfig.TABLES.DRIVERS)
                 .select('*')
                 .eq('id', driverId);
             
@@ -274,8 +274,8 @@ const AuthManager = {
     // Cargar repartidores en select de login
     async loadDriversForLogin() {
         try {
-            const { data: drivers, error } = await supabase
-                .from(AppConfig.TABLES.DRIVERS)
+            const { data: drivers, error } = await window.supabase
+                .from(window.AppConfig.TABLES.DRIVERS)
                 .select('id, name, username')
                 .eq('status', 'active')
                 .order('name');
