@@ -310,6 +310,27 @@
                             • <strong>Limpiar y Re-sincronizar:</strong> Borra todo local y vuelve a cargar desde Supabase
                         </div>
                     </div>
+
+                    <div class="mt-30">
+                        <h3>Herramientas de Rutas y Entregas</h3>
+                        <div class="flex gap-10" style="flex-wrap: wrap; margin-top: 15px;">
+                            <button class="btn btn-info" onclick="showRouteDiagnosis()">
+                                <i class="fas fa-stethoscope"></i> Diagnosticar Problemas
+                            </button>
+                            <button class="btn btn-primary" onclick="showManualAssignment()">
+                                <i class="fas fa-link"></i> Asignar Entregas Manualmente
+                            </button>
+                            <button class="btn btn-warning" onclick="RouteFixer.fixRouteRelationships()">
+                                <i class="fas fa-magic"></i> Reparar Relaciones
+                            </button>
+                        </div>
+                        <div class="alert alert-info mt-10" style="font-size: 13px;">
+                            <strong>🔧 Para resolver problemas de rutas sin entregas:</strong><br>
+                            1. Usa <strong>"Diagnosticar Problemas"</strong> para identificar entregas huérfanas<br>
+                            2. Usa <strong>"Asignar Entregas Manualmente"</strong> para vincular entregas a rutas<br>
+                            3. Usa <strong>"Reparar Relaciones"</strong> para corregir automáticamente problemas
+                        </div>
+                    </div>
                     
                     <div class="mt-30">
                         <h3>Información del Sistema</h3>
@@ -665,13 +686,14 @@
     <script src="js/supabase.js"></script>
     <script src="js/auth-supabase.js"></script>
     <script src="js/dataManager-supabase.js"></script>
-    <script src="js/sync-manager.js"></script> <!-- NUEVO -->
+    <script src="js/sync-manager.js"></script>
+    <script src="js/route-fixer.js"></script>
     <script src="js/uiManager.js"></script>
     <script src="js/routes-supabase.js"></script>
     <script src="js/deliveries-supabase.js"></script>
     <script src="js/drivers-supabase.js"></script>
     <script src="js/manualGuide.js"></script>
-    <script src="js/init-supabase.js"></script> <!-- NUEVO -->
+    <script src="js/init-supabase.js"></script>
     <script src="js/app-supabase.js"></script>
 </body>
 </html>
