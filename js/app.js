@@ -1,174 +1,205 @@
-// Aplicación principal
-const DeliveryApp = {
-    // Inicializar
-    async init() {
-        console.log('🚀 Iniciando Delivery Pro...');
-        
-        // Inicializar módulos
-        await this.initializeModules();
-        
-        // Configurar PWA
-        this.setupPWA();
-        
-        // Mostrar estado inicial
-        this.showInitialStatus();
-        
-        console.log('✅ Aplicación lista');
-    },
+// app.js - Archivo principal
+document.addEventListener('DOMContentLoaded', async function() {
+    console.log('🚀 Delivery Pro App iniciando...');
     
-    // Inicializar módulos
-    async initializeModules() {
-        try {
-            // 1. Configurar Supabase
-            const connection = await checkSupabaseConnection();
-            console.log('🔗 Conexión Supabase:', connection.success ? '✅' : '❌');
+    // Inicializar configuración
+    await initializeApp();
+});
+
+// Inicializar aplicación
+async function initializeApp() {
+    try {
+        // Mostrar estado de conexión
+        updateConnectionStatus('Conectando...', 'info');
+        
+        // Inicializar base de datos
+        const initResult = await initializeDatabase();
+        
+        if (initResult.success) {
+            showToast(initResult.message, 'success');
             
-            // 2. Inicializar base de datos si es necesario
-            await initializeDatabase();
+            // Cargar repartidores para login
+            if (window.AuthManager) {
+                await AuthManager.loadDriversForLogin();
+            }
             
-            // 3. Inicializar autenticación
-            await AuthManager.init();
+            // Configurar eventos
+            setupEventListeners();
             
-            // 4. Inicializar gestión de datos
-            await DataManager.init();
+            // Verificar autenticación automática
+            const autoLogin = await AuthManager.init();
+            if (autoLogin) {
+                console.log('✅ Sesión recuperada automáticamente');
+            }
             
-            // 5. Inicializar otros módulos
-            if (CSVManager) CSVManager.init();
-            if (RouteManager) RouteManager.init();
-            if (DeliveryManager) DeliveryManager.init();
-            if (DriverManager) DriverManager.init();
-            if (UIManager) UIManager.init();
-            
-            // 6. Escuchar cambios en los datos
-            document.addEventListener('dataChanged', () => {
-                // Actualizar estadísticas
-                UIManager.updateStats();
-                UIManager.updateActivityLog();
+            // Actualizar estado de conexión
+            updateConnectionStatus('✅ Conectado a Supabase', 'success');
+        } else {
+            console.error('❌ Error inicializando:', initResult.error);
+            updateConnectionStatus('⚠️ Error de conexión', 'error');
+            showToast('Modo offline activado', 'warning');
+        }
+    } catch (error) {
+        console.error('❌ Error inicializando aplicación:', error);
+        updateConnectionStatus('⚠️ Error crítico', 'error');
+    }
+}
+
+// Configurar event listeners
+function setupEventListeners() {
+    // Tabs de login
+    const loginTabs = document.querySelectorAll('.login-tabs .tab');
+    if (loginTabs) {
+        loginTabs.forEach(tab => {
+            tab.addEventListener('click', function() {
+                const tabId = this.dataset.tab;
+                
+                // Remover clase active de todos
+                loginTabs.forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                
+                // Añadir clase active al tab y contenido seleccionado
+                this.classList.add('active');
+                document.getElementById(tabId + 'Login').classList.add('active');
             });
-            
-        } catch (error) {
-            console.error('❌ Error inicializando módulos:', error);
-            showToast('Error inicializando la aplicación', 'error');
-        }
-    },
-    
-    // Configurar PWA
-    setupPWA() {
-        // Registrar service worker si está disponible
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/service-worker.js')
-                    .then(registration => {
-                        console.log('✅ Service Worker registrado:', registration);
-                    })
-                    .catch(error => {
-                        console.log('❌ Error registrando Service Worker:', error);
-                    });
-            });
-        }
-        
-        // Manejar instalación de PWA
-        let deferredPrompt;
-        
-        window.addEventListener('beforeinstallprompt', (e) => {
-            // Prevenir que Chrome muestre el prompt automático
-            e.preventDefault();
-            // Guardar el evento para mostrarlo más tarde
-            deferredPrompt = e;
-            
-            // Mostrar botón de instalación
-            this.showInstallButton();
         });
+    }
+    
+    // Drag and drop para CSV
+    setupCSVDragAndDrop();
+    
+    // Cerrar modales al hacer clic fuera
+    setupModalCloseListeners();
+}
+
+// Configurar drag and drop para CSV
+function setupCSVDragAndDrop() {
+    const dropZone = document.getElementById('csvDropZone');
+    if (!dropZone) return;
+    
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.style.borderColor = 'var(--primary)';
+        dropZone.style.background = 'var(--primary-light)';
+    });
+    
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.style.borderColor = '';
+        dropZone.style.background = '';
+    });
+    
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.style.borderColor = '';
+        dropZone.style.background = '';
         
-        // Manejar instalación
-        window.addEventListener('appinstalled', () => {
-            console.log('✅ PWA instalada');
-            deferredPrompt = null;
+        const files = e.dataTransfer.files;
+        if (files.length > 0 && files[0].name.toLowerCase().endsWith('.csv')) {
+            document.getElementById('csvFileInput').files = files;
+            CSVManager.handleFile(files[0]);
+        }
+    });
+}
+
+// Configurar cierre de modales
+function setupModalCloseListeners() {
+    const modals = document.querySelectorAll('.modal');
+    modals.forEach(modal => {
+        modal.addEventListener('click', function(e) {
+            if (e.target === this) {
+                this.classList.remove('active');
+            }
         });
-    },
+    });
+}
+
+// Actualizar estado de conexión
+function updateConnectionStatus(message, type) {
+    const statusElement = document.getElementById('connectionStatus');
+    if (!statusElement) return;
     
-    // Mostrar botón de instalación
-    showInstallButton() {
-        // Solo mostrar si estamos en modo standalone
-        if (window.matchMedia('(display-mode: browser)').matches) {
-            const installButton = document.createElement('button');
-            installButton.className = 'btn btn-success btn-sm';
-            installButton.innerHTML = '<i class="fas fa-download"></i> Instalar App';
-            installButton.onclick = this.installPWA;
-            
-            const headerActions = document.querySelector('.header-actions');
-            if (headerActions) {
-                headerActions.appendChild(installButton);
-            }
-        }
-    },
+    statusElement.textContent = message;
+    statusElement.className = 'connection-status';
     
-    // Instalar PWA
-    async installPWA() {
-        if (deferredPrompt) {
-            deferredPrompt.prompt();
-            const { outcome } = await deferredPrompt.userChoice;
-            
-            if (outcome === 'accepted') {
-                console.log('✅ Usuario aceptó la instalación');
-            } else {
-                console.log('❌ Usuario rechazó la instalación');
-            }
-            
-            deferredPrompt = null;
-        }
-    },
-    
-    // Mostrar estado inicial
-    showInitialStatus() {
-        // Actualizar fecha para repartidor
-        if (AuthManager.userRole === 'driver') {
-            AuthManager.updateDate();
-        }
-        
-        // Mostrar mensaje de bienvenida
-        setTimeout(() => {
-            if (AuthManager.isAuthenticated) {
-                showToast(`¡Bienvenido ${AuthManager.currentUser.name}!`, 'success');
-            }
-        }, 1000);
-    },
-    
-    // Limpiar todos los datos (solo para desarrollo)
-    clearAllData() {
-        if (!confirm('⚠️ ¿Estás seguro? Esto eliminará TODOS los datos locales.')) return;
-        
-        localStorage.clear();
-        showToast('Datos locales eliminados', 'info');
-        
-        // Recargar página
-        setTimeout(() => {
-            location.reload();
-        }, 1000);
+    switch(type) {
+        case 'success':
+            statusElement.classList.add('connected');
+            statusElement.innerHTML = `<i class="fas fa-wifi"></i> ${message}`;
+            break;
+        case 'error':
+            statusElement.classList.add('disconnected');
+            statusElement.innerHTML = `<i class="fas fa-wifi-slash"></i> ${message}`;
+            break;
+        case 'info':
+            statusElement.innerHTML = `<i class="fas fa-sync fa-spin"></i> ${message}`;
+            break;
+        case 'warning':
+            statusElement.classList.add('disconnected');
+            statusElement.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
+            break;
+    }
+}
+
+// Función para mostrar secciones (admin)
+window.showSection = function(sectionId) {
+    if (window.UIManager) {
+        UIManager.showSection(sectionId);
     }
 };
 
-// Funciones globales adicionales
-window.clearAllData = function() {
-    DeliveryApp.clearAllData();
+// Función para mostrar secciones (repartidor)
+window.showDriverSection = function(sectionId) {
+    if (window.UIManager) {
+        UIManager.showDriverSection(sectionId);
+    }
 };
 
-// Mostrar sección por defecto en URL hash
-window.addEventListener('hashchange', () => {
-    const hash = window.location.hash.substring(1);
-    if (hash) {
-        if (AuthManager.userRole === 'admin') {
-            showSection(hash);
-        } else if (AuthManager.userRole === 'driver') {
-            showDriverSection(hash);
-        }
+// Función para alternar sidebar
+window.toggleSidebar = function() {
+    if (window.UIManager) {
+        UIManager.toggleSidebar();
+    }
+};
+
+// Función para refrescar datos
+window.refreshData = async function() {
+    showToast('Actualizando datos...', 'info');
+    
+    try {
+        await DataManager.loadInitialData();
+        showToast('Datos actualizados correctamente', 'success');
+    } catch (error) {
+        showToast('Error actualizando datos', 'error');
+    }
+};
+
+// Inicializar módulos cuando estén disponibles
+document.addEventListener('DOMContentLoaded', function() {
+    // Inicializar CSV Manager
+    if (window.CSVManager) {
+        CSVManager.init();
+    }
+    
+    // Inicializar UI Manager
+    if (window.UIManager) {
+        UIManager.init();
+    }
+    
+    // Inicializar Route Manager
+    if (window.RouteManager) {
+        RouteManager.init();
+    }
+    
+    // Inicializar Delivery Manager
+    if (window.DeliveryManager) {
+        DeliveryManager.init();
+    }
+    
+    // Inicializar Driver Manager
+    if (window.DriverManager) {
+        DriverManager.init();
     }
 });
 
-// Inicializar aplicación cuando el DOM esté listo
-document.addEventListener('DOMContentLoaded', () => {
-    DeliveryApp.init();
-});
-
-// Exportar para uso global
-window.DeliveryApp = DeliveryApp;
+// Exportar funciones globales
+window.initializeApp = initializeApp;
