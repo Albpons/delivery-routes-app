@@ -7,7 +7,7 @@ async function initApp() {
     // Establecer admin como tipo de usuario por defecto
     selectUserType('admin');
     
-    // Verificar conexión a Supabase (pero no es crítica para el login)
+    // Verificar conexión a Supabase
     await checkSupabaseConnection();
     
     // Intentar autenticación automática desde localStorage
@@ -17,6 +17,13 @@ async function initApp() {
         if (autoLogin) {
             console.log('✅ Sesión recuperada automáticamente');
             console.log('Usuario:', AuthManagerSupabase.currentUser?.name);
+            
+            // Cargar datos según el usuario
+            if (AuthManagerSupabase.currentUser.role === 'admin') {
+                await loadAdminData();
+            } else {
+                await loadDriverData();
+            }
         } else {
             console.log('🔐 Inicia sesión manualmente');
             showLoginInstructions();
@@ -37,6 +44,11 @@ function showLoginInstructions() {
             const instructions = document.createElement('div');
             instructions.className = 'alert alert-info mt-20';
             instructions.style.fontSize = '13px';
+            instructions.innerHTML = `
+                <strong>💡 Instrucciones de prueba:</strong><br>
+                <small>Admin: Usuario: <code>admin</code> / Contraseña: <code>admin123</code><br>
+                Repartidor: Usuario: <code>rosa</code> / Contraseña: <code>rosa123</code></small>
+            `;
             loginCard.appendChild(instructions);
         }
     }, 1500);
@@ -114,9 +126,6 @@ function assignGlobalEvents() {
             localStorage.removeItem('delivery_deliveries');
             localStorage.removeItem('delivery_drivers');
             
-            // No eliminar currentUser para mantener la sesión
-            // localStorage.removeItem('currentUser');
-            
             if (window.UIManager) {
                 UIManager.showNotification('🗑️ Datos locales eliminados', 'success');
             }
@@ -141,25 +150,63 @@ function assignGlobalEvents() {
 // Cargar datos para admin
 async function loadAdminData() {
     try {
+        console.log('📊 Cargando datos de admin...');
+        
+        let routes = [];
+        let deliveries = [];
+        let drivers = [];
+        
         // Intentar con Supabase si está disponible
         if (window.supabase && window.DataManagerSupabase) {
-            await DataManagerSupabase.loadInitialData();
+            console.log('📥 Intentando cargar desde Supabase...');
+            try {
+                routes = await DataManagerSupabase.getRoutesFromSupabase();
+                deliveries = await DataManagerSupabase.getDeliveriesFromSupabase();
+                drivers = await DataManagerSupabase.getDriversFromSupabase();
+                
+                console.log(`✅ Supabase: ${routes.length} rutas, ${deliveries.length} entregas, ${drivers.length} repartidores`);
+            } catch (supabaseError) {
+                console.warn('⚠️ Error cargando desde Supabase:', supabaseError);
+            }
         }
+        
+        // Si no hay datos en Supabase, cargar desde localStorage
+        if (routes.length === 0 && deliveries.length === 0 && drivers.length === 0) {
+            console.log('📁 Cargando desde localStorage...');
+            routes = JSON.parse(localStorage.getItem('delivery_routes') || '[]');
+            deliveries = JSON.parse(localStorage.getItem('delivery_deliveries') || '[]');
+            drivers = JSON.parse(localStorage.getItem('delivery_drivers') || '[]');
+        }
+        
+        // Inicializar datos de demostración si está vacío
+        if (drivers.length === 0) {
+            console.log('🎯 Inicializando datos de demostración...');
+            drivers = await initializeDemoDrivers();
+        }
+        
+        // Guardar en localStorage como respaldo
+        localStorage.setItem('delivery_routes', JSON.stringify(routes));
+        localStorage.setItem('delivery_deliveries', JSON.stringify(deliveries));
+        localStorage.setItem('delivery_drivers', JSON.stringify(drivers));
+        
+        console.log(`📊 Datos cargados: ${routes.length} rutas, ${deliveries.length} entregas, ${drivers.length} repartidores`);
         
         // Cargar UI
         if (window.UIManager) {
             await UIManager.loadDashboard();
             
-            // Cargar vistas específicas
-            if (window.RouteManagerSupabase) {
-                setTimeout(() => RouteManagerSupabase.loadRoutes(), 300);
-            }
-            if (window.DeliveryManagerSupabase) {
-                setTimeout(() => DeliveryManagerSupabase.loadDeliveries(), 500);
-            }
-            if (window.DriverManagerSupabase) {
-                setTimeout(() => DriverManagerSupabase.loadDrivers(), 700);
-            }
+            // Cargar vistas específicas con retraso para evitar conflictos
+            setTimeout(async () => {
+                if (window.RouteManagerSupabase) {
+                    await RouteManagerSupabase.loadRoutes();
+                }
+                if (window.DeliveryManagerSupabase) {
+                    await DeliveryManagerSupabase.loadDeliveries();
+                }
+                if (window.DriverManagerSupabase) {
+                    await DriverManagerSupabase.loadDrivers();
+                }
+            }, 500);
         }
         
     } catch (error) {
@@ -172,6 +219,87 @@ async function loadAdminData() {
     }
 }
 
+// Inicializar drivers de demostración
+async function initializeDemoDrivers() {
+    const demoDrivers = [
+        {
+            id: 1,
+            name: 'Rosa García',
+            username: 'rosa',
+            email: 'rosa@example.com',
+            phone: '600111222',
+            vehicle: 'Motocicleta',
+            license: 'M-12345',
+            status: 'active',
+            deliveries: 0
+        },
+        {
+            id: 2,
+            name: 'Sonia Martínez',
+            username: 'sonia',
+            email: 'sonia@example.com',
+            phone: '600222333',
+            vehicle: 'Coche',
+            license: 'B-54321',
+            status: 'active',
+            deliveries: 0
+        },
+        {
+            id: 3,
+            name: 'Nuria López',
+            username: 'nuria',
+            email: 'nuria@example.com',
+            phone: '600333444',
+            vehicle: 'Furgoneta',
+            license: 'C-11223',
+            status: 'active',
+            deliveries: 0
+        },
+        {
+            id: 4,
+            name: 'Santiago Ruiz',
+            username: 'santi',
+            email: 'santi@example.com',
+            phone: '600444555',
+            vehicle: 'Bicicleta',
+            license: 'BIC-001',
+            status: 'active',
+            deliveries: 0
+        },
+        {
+            id: 5,
+            name: 'Albert Torres',
+            username: 'albert',
+            email: 'albert@example.com',
+            phone: '600555666',
+            vehicle: 'Motocicleta',
+            license: 'M-66778',
+            status: 'active',
+            deliveries: 0
+        }
+    ];
+    
+    // Intentar guardar en Supabase si está disponible
+    if (window.supabase && window.DataManagerSupabase) {
+        for (const driver of demoDrivers) {
+            try {
+                await DataManagerSupabase.createDriver(driver);
+            } catch (e) {
+                console.log('No se pudo guardar en Supabase:', e.message);
+            }
+        }
+    }
+    
+    // Guardar en localStorage
+    localStorage.setItem('delivery_drivers', JSON.stringify(demoDrivers));
+    
+    if (window.UIManager) {
+        UIManager.showNotification('✅ Datos de demostración cargados', 'success');
+    }
+    
+    return demoDrivers;
+}
+
 // Cargar datos para driver
 async function loadDriverData() {
     try {
@@ -179,6 +307,7 @@ async function loadDriverData() {
             await UIManager.loadDriverRoutes();
             await UIManager.loadDriverDeliveries();
             await UIManager.updateDriverProfile();
+            UIManager.updateDriverDate();
         }
     } catch (error) {
         console.error('Error cargando datos driver:', error);
@@ -322,7 +451,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Pequeño retraso para asegurar que los scripts se carguen
     setTimeout(() => {
         initApp();
-    }, 500);
+    }, 1000);
 });
 
 // Exportar funciones globales (mantener compatibilidad)

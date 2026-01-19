@@ -213,7 +213,7 @@ const DataManagerSupabase = {
                     address: delivery.address,
                     phone: delivery.phone,
                     route: delivery.route,
-                    order_details: delivery.order,  // <-- CAMBIADO A 'order_details'
+                    order_details: delivery.order_details || delivery.order,  // <-- CAMBIADO A 'order_details'
                     observations: delivery.observations,
                     status: delivery.status || 'pending',
                     created_at: new Date().toISOString()
@@ -244,7 +244,7 @@ const DataManagerSupabase = {
                     address: delivery.address,
                     phone: delivery.phone,
                     route: delivery.route,
-                    order_details: delivery.order,  // <-- CAMBIADO AQUÍ TAMBIÉN
+                    order_details: delivery.order_details || delivery.order,  // <-- CAMBIADO AQUÍ TAMBIÉN
                     observations: delivery.observations,
                     status: delivery.status,
                     updated_at: new Date().toISOString()
